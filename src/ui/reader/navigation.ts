@@ -1,0 +1,96 @@
+/**
+ * Turning pages from the keyboard, the mouse wheel and taps on the page.
+ *
+ * Book pages are documents in iframes, and their events do not reach the app's document, so
+ * the reader attaches these handlers to every page document as well as to the app.
+ */
+
+export type Turn = 'prev' | 'next' | 'left' | 'right'
+
+export interface Navigator {
+  turn(direction: Turn): void
+  toggleChrome(): void
+  hideChrome(): void
+  /** True while something else (a dialog) owns the keyboard. */
+  isBusy(): boolean
+}
+
+const editable = (target: EventTarget | null) =>
+  target instanceof Element &&
+  target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]') !== null
+
+const interactive = 'a[href], button, input, select, textarea, label, audio, video, [role="button"]'
+
+const keyTurns: Record<string, Turn> = {
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowUp: 'prev',
+  ArrowDown: 'next',
+  PageUp: 'prev',
+  PageDown: 'next',
+}
+
+export function handleKey(event: KeyboardEvent, navigator: Navigator): void {
+  if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
+  if (navigator.isBusy() || editable(event.target)) return
+  let turn = keyTurns[event.key]
+  if (event.key === ' ') turn = event.shiftKey ? 'prev' : 'next'
+  if (turn) {
+    event.preventDefault()
+    navigator.turn(turn)
+  } else if (
+    event.key === 'Enter' &&
+    !(event.target instanceof Element && event.target.closest(interactive))
+  ) {
+    navigator.toggleChrome()
+  } else if (event.key === 'Escape') {
+    navigator.hideChrome()
+  }
+}
+
+/**
+ * One page per wheel gesture. A trackpad fling sends a long tail of events; the turn is
+ * locked until they stop, so the fling turns one page instead of a dozen.
+ */
+export function createWheelHandler(navigator: Navigator): (event: WheelEvent) => void {
+  const quietMs = 250
+  let locked = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return (event) => {
+    // Ctrl with the wheel is pinch-zoom on a trackpad.
+    if (event.ctrlKey || navigator.isBusy()) return
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      locked = false
+    }, quietMs)
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+    if (locked || Math.abs(delta) < 4) return
+    locked = true
+    navigator.turn(delta > 0 ? 'next' : 'prev')
+  }
+}
+
+/**
+ * Taps on the outer thirds of the screen turn the page that way; a tap in the middle shows
+ * or hides the reader's controls. `x` is the tap's position in the app's viewport.
+ */
+export function handleTap(event: MouseEvent, x: number, navigator: Navigator): void {
+  if (event.defaultPrevented || event.button !== 0 || navigator.isBusy()) return
+  if (event.target instanceof Element && event.target.closest(interactive)) return
+  const selection = (event.view ?? window).getSelection()
+  if (selection && !selection.isCollapsed) return
+  const position = x / window.innerWidth
+  if (position < 1 / 3) navigator.turn('left')
+  else if (position > 2 / 3) navigator.turn('right')
+  else navigator.toggleChrome()
+}
+
+/** Where a click inside a page document falls in the app's viewport. */
+export function viewportX(event: MouseEvent, doc: Document): number {
+  const frame = doc.defaultView?.frameElement
+  if (!(frame instanceof HTMLElement)) return event.clientX
+  const rect = frame.getBoundingClientRect()
+  // Fixed-layout pages are scaled with a transform; the event's coordinates are not.
+  const scale = frame.offsetWidth ? rect.width / frame.offsetWidth : 1
+  return rect.left + event.clientX * scale
+}

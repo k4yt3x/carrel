@@ -1,0 +1,101 @@
+@import "tailwindcss";
+@import "./styles/theme.css";
+
+/* Only the components the app uses: daisyUI adds the CSS of every component it includes. */
+@plugin "daisyui" {
+  themes: false;
+  logs: false;
+  include:
+    button, input, select, modal, loading, range, svg, properties, rootscrolllock, rootscrollgutter,
+    scrollbar;
+}
+
+/*
+ * daisyUI's theme contract, filled from the semantic tokens so its components draw from the
+ * same system as everything else. The semantic tokens already switch with the colour scheme,
+ * so one daisyUI theme serves both.
+ */
+@plugin "daisyui/theme" {
+  name: "carrel";
+  default: true;
+  color-scheme: light dark;
+  --color-base-100: var(--color-surface-raised);
+  --color-base-200: var(--color-surface-sunken);
+  --color-base-300: var(--color-border);
+  --color-base-content: var(--color-fg);
+  --color-primary: var(--color-action);
+  --color-primary-content: var(--color-on-action);
+  --color-secondary: var(--color-action);
+  --color-secondary-content: var(--color-on-action);
+  --color-accent: var(--color-action);
+  --color-accent-content: var(--color-on-action);
+  --color-neutral: var(--color-fg);
+  --color-neutral-content: var(--color-surface);
+  --color-info: var(--color-action-subtle);
+  --color-info-content: var(--color-action-fg);
+  --color-success: var(--color-action-subtle);
+  --color-success-content: var(--color-action-fg);
+  --color-warning: var(--color-warning-subtle);
+  --color-warning-content: var(--color-warning-fg);
+  --color-error: var(--color-danger);
+  --color-error-content: var(--color-on-danger);
+  --radius-selector: var(--radius-md);
+  --radius-field: var(--radius-md);
+  --radius-box: var(--radius-lg);
+  --size-selector: 4px;
+  --size-field: 4px;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-surface);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    line-height: var(--leading-normal);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .lucide {
+    stroke-width: 1.75;
+  }
+
+  foliate-view {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /*
+   * Running heads and feet, which foliate-js lays out in the page margins. The paginator
+   * paints the page background on a positioned layer that would otherwise cover them.
+   */
+  foliate-view::part(head),
+  foliate-view::part(foot) {
+    position: relative;
+    z-index: 1;
+    color: var(--color-fg-muted);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      /* biome-ignore-start lint/complexity/noImportantStyles: reduced motion has to win over every component's own transition */
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      /* biome-ignore-end lint/complexity/noImportantStyles: reduced motion has to win over every component's own transition */
+    }
+  }
+}

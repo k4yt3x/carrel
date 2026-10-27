@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Package manager caches kept inside the project when the home directory is not writable
+.cache/
+
+# Playwright
+test-results/
+playwright-report/

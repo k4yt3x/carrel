@@ -1,0 +1,367 @@
+{
+  "$meta": {
+    "name": "Carrel",
+    "source": "refactoring-ui skill, Workflow A",
+    "personality": {
+      "formality": "serious",
+      "era": "classic",
+      "density": "spacious",
+      "grey-temperature": "warm"
+    },
+    "generated": {
+      "primary": "generate_palette.py --base '#3d8667' --name primary --darkest 16 --cap 15 --extended",
+      "neutral": "generate_palette.py --grey --temperature warm --extended --name neutral --grey-saturation 6 --darkest 18 --lightest 94",
+      "danger": "generate_palette.py --base '#c53030' --toward cool --name danger",
+      "warning": "generate_palette.py --base '#c27c0e' --name warning"
+    },
+    "pairs-note": "Only real text-on-background pairs. Borders and dividers are not text."
+  },
+  "primitive": {
+    "color": {
+      "white": "#ffffff",
+      "primary": {
+        "50": "#f6fffd",
+        "100": "#ebfffb",
+        "200": "#b6eae1",
+        "300": "#89cdbe",
+        "400": "#5eaf94",
+        "500": "#3d8667",
+        "600": "#317553",
+        "700": "#26643f",
+        "800": "#1b532d",
+        "900": "#104120",
+        "950": "#042910"
+      },
+      "neutral": {
+        "50": "#fafaf6",
+        "100": "#f3f2ed",
+        "200": "#d8d7cf",
+        "300": "#bdbbb2",
+        "400": "#a29e95",
+        "500": "#878178",
+        "600": "#726b64",
+        "700": "#5d5550",
+        "800": "#48403d",
+        "900": "#332b29",
+        "950": "#1d1716"
+      },
+      "danger": {
+        "100": "#ffebf1",
+        "200": "#ffadc9",
+        "300": "#f27da4",
+        "400": "#de5474",
+        "500": "#c53030",
+        "600": "#af2424",
+        "700": "#981818",
+        "800": "#810d0d",
+        "900": "#690202"
+      },
+      "warning": {
+        "100": "#fffeeb",
+        "200": "#fff4a4",
+        "300": "#ffdd5e",
+        "400": "#eab12d",
+        "500": "#c27c0e",
+        "600": "#b06206",
+        "700": "#9e4900",
+        "800": "#843300",
+        "900": "#6b2200"
+      }
+    },
+    "font": {
+      "sans": "system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif",
+      "serif": "'Iowan Old Style', 'Palatino Linotype', Palatino, 'URW Palladio L', P052, 'Book Antiqua', Georgia, serif",
+      "mono": "ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace"
+    },
+    "text": {
+      "xs": "12px",
+      "sm": "14px",
+      "base": "16px",
+      "lg": "18px",
+      "xl": "20px",
+      "2xl": "24px",
+      "3xl": "30px",
+      "4xl": "36px",
+      "5xl": "48px",
+      "6xl": "60px",
+      "7xl": "72px"
+    },
+    "spacing": {
+      "0": "0px",
+      "1": "4px",
+      "2": "8px",
+      "3": "12px",
+      "4": "16px",
+      "6": "24px",
+      "8": "32px",
+      "12": "48px",
+      "16": "64px",
+      "24": "96px",
+      "32": "128px",
+      "48": "192px",
+      "64": "256px",
+      "96": "384px",
+      "128": "512px",
+      "160": "640px",
+      "192": "768px"
+    },
+    "font-weight": {
+      "normal": "400",
+      "semibold": "600"
+    },
+    "leading": {
+      "none": "1",
+      "tight": "1.25",
+      "normal": "1.5",
+      "loose": "2"
+    },
+    "radius": {
+      "sm": "2px",
+      "md": "4px",
+      "lg": "8px",
+      "full": "9999px"
+    },
+    "shadow": {
+      "sm": "0 1px 3px hsla(15, 15%, 10%, 0.2)",
+      "md": "0 4px 6px hsla(15, 15%, 10%, 0.2)",
+      "lg": "0 5px 15px hsla(15, 15%, 10%, 0.2)",
+      "xl": "0 10px 24px hsla(15, 15%, 10%, 0.2)",
+      "2xl": "0 15px 35px hsla(15, 15%, 10%, 0.2)"
+    },
+    "inset-shadow": {
+      "sm": "inset 0 2px 4px hsla(15, 15%, 10%, 0.06)"
+    }
+  },
+  "semantic": {
+    "color": {
+      "surface": "{color.neutral.50}",
+      "surface-raised": "{color.white}",
+      "surface-sunken": "{color.neutral.100}",
+      "surface-hover": "{color.neutral.100}",
+      "fg": "{color.neutral.900}",
+      "fg-secondary": "{color.neutral.700}",
+      "fg-muted": "{color.neutral.600}",
+      "border": "{color.neutral.200}",
+      "border-strong": "{color.neutral.300}",
+      "action": "{color.primary.600}",
+      "action-hover": "{color.primary.700}",
+      "action-subtle": "{color.primary.100}",
+      "action-fg": "{color.primary.700}",
+      "on-action": "{color.white}",
+      "danger": "{color.danger.600}",
+      "danger-hover": "{color.danger.700}",
+      "danger-subtle": "{color.danger.100}",
+      "danger-fg": "{color.danger.700}",
+      "on-danger": "{color.white}",
+      "warning-subtle": "{color.warning.100}",
+      "warning-fg": "{color.warning.800}",
+      "focus": "{color.primary.500}",
+      "scrim": "{color.neutral.950}",
+      "cover": "{color.primary.800}",
+      "on-cover": "{color.primary.100}",
+      "on-cover-muted": "{color.primary.200}"
+    }
+  },
+  "semantic-dark": {
+    "color": {
+      "surface": "{color.neutral.950}",
+      "surface-raised": "{color.neutral.900}",
+      "surface-sunken": "{color.neutral.900}",
+      "surface-hover": "{color.neutral.800}",
+      "fg": "{color.neutral.200}",
+      "fg-secondary": "{color.neutral.300}",
+      "fg-muted": "{color.neutral.400}",
+      "border": "{color.neutral.800}",
+      "border-strong": "{color.neutral.700}",
+      "action": "{color.primary.600}",
+      "action-hover": "{color.primary.700}",
+      "action-subtle": "{color.primary.950}",
+      "action-fg": "{color.primary.300}",
+      "on-action": "{color.white}",
+      "danger": "{color.danger.600}",
+      "danger-hover": "{color.danger.700}",
+      "danger-subtle": "{color.danger.900}",
+      "danger-fg": "{color.danger.300}",
+      "on-danger": "{color.white}",
+      "warning-subtle": "{color.warning.900}",
+      "warning-fg": "{color.warning.200}",
+      "focus": "{color.primary.400}",
+      "scrim": "{color.neutral.950}",
+      "cover": "{color.primary.900}",
+      "on-cover": "{color.primary.100}",
+      "on-cover-muted": "{color.primary.200}"
+    }
+  },
+  "pairs": [
+    {
+      "name": "light: body text on page",
+      "fg": "#332b29",
+      "bg": "#fafaf6"
+    },
+    {
+      "name": "light: secondary text on page",
+      "fg": "#5d5550",
+      "bg": "#fafaf6"
+    },
+    {
+      "name": "light: muted text on page",
+      "fg": "#726b64",
+      "bg": "#fafaf6"
+    },
+    {
+      "name": "light: muted text on raised",
+      "fg": "#726b64",
+      "bg": "#ffffff"
+    },
+    {
+      "name": "light: muted text on sunken",
+      "fg": "#726b64",
+      "bg": "#f3f2ed"
+    },
+    {
+      "name": "light: body text on sunken",
+      "fg": "#332b29",
+      "bg": "#f3f2ed"
+    },
+    {
+      "name": "light: primary button",
+      "fg": "#ffffff",
+      "bg": "#317553"
+    },
+    {
+      "name": "light: primary button hover",
+      "fg": "#ffffff",
+      "bg": "#26643f"
+    },
+    {
+      "name": "light: action text on page",
+      "fg": "#26643f",
+      "bg": "#fafaf6"
+    },
+    {
+      "name": "light: action text on raised",
+      "fg": "#26643f",
+      "bg": "#ffffff"
+    },
+    {
+      "name": "light: selected item text",
+      "fg": "#26643f",
+      "bg": "#ebfffb"
+    },
+    {
+      "name": "light: danger button",
+      "fg": "#ffffff",
+      "bg": "#af2424"
+    },
+    {
+      "name": "light: danger text on raised",
+      "fg": "#981818",
+      "bg": "#ffffff"
+    },
+    {
+      "name": "light: danger alert (flipped)",
+      "fg": "#981818",
+      "bg": "#ffebf1"
+    },
+    {
+      "name": "light: warning alert (flipped)",
+      "fg": "#843300",
+      "bg": "#fffeeb"
+    },
+    {
+      "name": "dark: body text on page",
+      "fg": "#d8d7cf",
+      "bg": "#1d1716"
+    },
+    {
+      "name": "dark: secondary text on page",
+      "fg": "#bdbbb2",
+      "bg": "#1d1716"
+    },
+    {
+      "name": "dark: muted text on page",
+      "fg": "#a29e95",
+      "bg": "#1d1716"
+    },
+    {
+      "name": "dark: muted text on raised",
+      "fg": "#a29e95",
+      "bg": "#332b29"
+    },
+    {
+      "name": "dark: body text on raised",
+      "fg": "#d8d7cf",
+      "bg": "#332b29"
+    },
+    {
+      "name": "dark: body text on hover",
+      "fg": "#d8d7cf",
+      "bg": "#48403d"
+    },
+    {
+      "name": "dark: primary button",
+      "fg": "#ffffff",
+      "bg": "#317553"
+    },
+    {
+      "name": "dark: primary button hover",
+      "fg": "#ffffff",
+      "bg": "#26643f"
+    },
+    {
+      "name": "dark: action text on page",
+      "fg": "#89cdbe",
+      "bg": "#1d1716"
+    },
+    {
+      "name": "dark: action text on raised",
+      "fg": "#89cdbe",
+      "bg": "#332b29"
+    },
+    {
+      "name": "dark: selected item text",
+      "fg": "#89cdbe",
+      "bg": "#042910"
+    },
+    {
+      "name": "dark: danger button",
+      "fg": "#ffffff",
+      "bg": "#af2424"
+    },
+    {
+      "name": "dark: danger text on raised",
+      "fg": "#f27da4",
+      "bg": "#332b29"
+    },
+    {
+      "name": "dark: danger alert (flipped)",
+      "fg": "#f27da4",
+      "bg": "#690202"
+    },
+    {
+      "name": "dark: warning alert (flipped)",
+      "fg": "#fff4a4",
+      "bg": "#6b2200"
+    },
+    {
+      "name": "light: placeholder cover title",
+      "fg": "#ebfffb",
+      "bg": "#1b532d"
+    },
+    {
+      "name": "light: placeholder cover author",
+      "fg": "#b6eae1",
+      "bg": "#1b532d"
+    },
+    {
+      "name": "dark: placeholder cover title",
+      "fg": "#ebfffb",
+      "bg": "#104120"
+    },
+    {
+      "name": "dark: placeholder cover author",
+      "fg": "#b6eae1",
+      "bg": "#104120"
+    }
+  ]
+}

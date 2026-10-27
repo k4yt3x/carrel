@@ -1,0 +1,50 @@
+{
+  "name": "carrel",
+  "version": "0.0.0",
+  "private": true,
+  "description": "An e-book reader that runs entirely in the browser",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "design:emit": "node design/emit.ts && biome format --write src/styles/theme.css design/tokens.css"
+  },
+  "dependencies": {
+    "dexie": "^4.4.7",
+    "dexie-react-hooks": "^4.4.0",
+    "foliate-js": "github:readest/foliate-js#0c7a0edcda672218e958fb92b4cdf090d7ca9daa",
+    "hash-wasm": "^4.12.0",
+    "lucide-react": "^1.61.0",
+    "pdfjs-dist": "6.2.108",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zustand": "^5.0.16"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.3",
+    "@playwright/test": "^1.64.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "daisyui": "^5.7.50",
+    "fake-indexeddb": "^6.2.6",
+    "fflate": "^0.8.3",
+    "jsdom": "^30.1.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vite-plugin-static-copy": "^4.1.1",
+    "vitest": "^5.0.5"
+  }
+}
