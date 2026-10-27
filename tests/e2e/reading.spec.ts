@@ -9,6 +9,9 @@ const addBooks = async (page: Page, ...files: FixtureFile[]) => {
 const openBook = async (page: Page, title: string) => {
   await page.goto('/')
   await page.getByRole('link', { name: title }).first().click()
+  // The bars come with the book once it has opened: until then, a key or a click on the page
+  // can come too early.
+  await expect(page.getByRole('button', { name: 'Reading settings' })).toBeAttached()
   await expect(page.getByRole('status')).toHaveCount(0)
   await expect.poll(() => page.locator('foliate-view').evaluate(hasPage)).toBe(true)
 }

@@ -249,6 +249,9 @@ function textExtent(view: View): Extent | null {
   return { left: Math.round(rect.left), width: Math.round(rect.width) }
 }
 
+/** The renderer's scale-factor, in percent: the zoom applied to the page fit. */
+const scalePercent = (zoom: number, fit: number) => Math.round(zoom * fit * 100) / 100
+
 /** Space kept above and below a whole page fitted to the window's height. */
 const pageInset = 8
 
@@ -271,6 +274,21 @@ function wholePageScale(view: View, shape: number): number {
   const { clientWidth, clientHeight } = view.renderer
   if (shape <= 0 || clientWidth <= 0) return 1
   return Math.min(1, (clientHeight - 2 * pageInset) / (clientWidth * shape))
+}
+
+/**
+ * The page fit of a fixed layout for its settings and the pages on show: under Whole page in
+ * scrolled layout, the scale that fits the tallest page seen yet (kept in `tallest`) to the
+ * window's height; otherwise 1, the pages filling the width as the renderer lays them out.
+ */
+function wholePageFit(
+  view: View,
+  settings: ReadingSettings | undefined,
+  tallest: { current: number },
+): number {
+  if (!view.isFixedLayout || settings?.flow !== 'scrolled' || settings.pageFit !== 'page') return 1
+  tallest.current = Math.max(tallest.current, pageShape(view))
+  return wholePageScale(view, tallest.current)
 }
 
 /**
@@ -400,10 +418,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
     measureFrame.current = requestAnimationFrame(() => {
       const view = viewRef.current
       if (view?.isFixedLayout) {
-        const current = latest.current.settings
-        const whole = current?.flow === 'scrolled' && current.pageFit === 'page'
-        if (whole) tallestPage.current = Math.max(tallestPage.current, pageShape(view))
-        const next = whole ? wholePageScale(view, tallestPage.current) : 1
+        const next = wholePageFit(view, latest.current.settings, tallestPage)
         setPageFit((fit) => (Math.abs(fit - next) < 0.001 ? fit : next))
       }
       const extent = view ? textExtent(view) : null
@@ -437,7 +452,6 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   // Handlers attached to book documents outlive renders; they read the latest state here.
   const latest = useRef({
     title: '',
-    ready: false,
     busy: false,
     settings,
     appearance: null as Appearance | null,
@@ -446,7 +460,6 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   })
   latest.current = {
     title: record?.title ?? '',
-    ready: status === 'ready',
     // The contents are a modal sheet on a narrow window; docked, they leave the keys to the page.
     busy: panel !== null || note !== null || (tocOpen && !wide),
     settings,
@@ -467,6 +480,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
     let cancelled = false
     let view: View | null = null
     let book: Book | null = null
+    let bookInView = false
     const saver = createProgressSaver(bookId, (error) => {
       if (error) console.error('could not save the reading position', error)
       setSaveFailed(Boolean(error))
@@ -501,7 +515,9 @@ export function ReaderPage({ bookId }: { bookId: string }) {
       toggleChrome: () => setChromeShown((shown) => !shown),
       hideChrome: () => setChromeShown(false),
       openSearch: () => {
-        if (!latest.current.ready) return
+        // Searching needs the book open in the view; before that (and on the error screens)
+        // the key does nothing.
+        if (!bookInView) return
         setChromeShown(false)
         setNote(null)
         setPanel('search')
@@ -625,6 +641,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
       container.append(view)
       await view.open(book)
       if (cancelled) return
+      bookInView = true
 
       const appearance = latest.current.appearance
       if (appearance) applyAppearance(view, appearance, applied.current)
@@ -646,6 +663,13 @@ export function ReaderPage({ bookId }: { bookId: string }) {
         // layout scrolls a screenful down the first page.
         await view.goToFraction(0)
         if (cancelled) return
+      }
+      // A scrolled fixed layout is fitted to the whole page before it shows, rather than shown
+      // at the width and then shrunk, which would also move it under a key pressed meanwhile.
+      const fit = wholePageFit(view, latest.current.settings, tallestPage)
+      if (fit < 1) {
+        applyAttributes(view.renderer, { 'scale-factor': String(scalePercent(100, fit)) })
+        setPageFit(fit)
       }
       setStatus('ready')
       markOpened(bookId).catch((error: unknown) =>
@@ -704,7 +728,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   useEffect(() => {
     const view = viewRef.current
     if (status !== 'ready' || !view?.isFixedLayout) return
-    const scale = Math.round(zoom * pageFit * 100) / 100
+    const scale = scalePercent(zoom, pageFit)
     // Unset is the same as 100%; setting it anyway would lay the pages out a second time.
     if (scale === 100 && !view.renderer.hasAttribute('scale-factor')) return
     applyAttributes(view.renderer, { 'scale-factor': String(scale) })
