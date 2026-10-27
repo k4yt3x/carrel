@@ -52,17 +52,24 @@ function png(width: number, height: number, [r, g, b]: [number, number, number])
 const paragraph = (chapter: number, n: number) =>
   `<p>Chapter ${chapter}, paragraph ${n}. The reading room was quiet except for the turning of pages, and the lamp at each carrel threw a small circle of light onto the desk below it, where the books lay open.</p>`
 
+/** A note reference at the top of the chapter, and the note itself at its end. */
+const footnoteRef = `<p>Carrels were first built into cloister walls.<a epub:type="noteref" href="#note-1">1</a></p>`
+const footnote = `<aside epub:type="footnote" id="note-1"><p>The note says that monks read in them.</p></aside>`
+
 const chapterXhtml = (
   chapter: number,
   title: string,
   extra = '',
+  withFootnote = false,
 ) => `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 <head><title>${title}</title></head>
 <body${extra ? ' onload="window.top.__bookScriptRan = true"' : ''}>
 <h1>${title}</h1>
 ${extra}
+${withFootnote ? footnoteRef : ''}
 ${Array.from({ length: 40 }, (_, i) => paragraph(chapter, i + 1)).join('\n')}
+${withFootnote ? footnote : ''}
 </body>
 </html>`
 
@@ -73,9 +80,11 @@ interface EpubOptions {
   cover?: [number, number, number]
   /** Markup inserted into the first chapter. */
   extra?: string
+  /** Gives the first chapter a footnote. */
+  footnote?: boolean
 }
 
-export function epub({ title, author, cover, extra = '' }: EpubOptions): Buffer {
+export function epub({ title, author, cover, extra = '', footnote = false }: EpubOptions): Buffer {
   const chapters = ['Chapter One', 'Chapter Two', 'Chapter Three']
   const manifest = chapters
     .map(
@@ -116,11 +125,15 @@ ${chapters.map((name, i) => `<li><a href="c${i + 1}.xhtml">${name}</a></li>`).jo
     'OEBPS/nav.xhtml': strToU8(nav),
   }
   chapters.forEach((name, i) => {
-    files[`OEBPS/c${i + 1}.xhtml`] = strToU8(chapterXhtml(i + 1, name, i === 0 ? extra : ''))
+    files[`OEBPS/c${i + 1}.xhtml`] = strToU8(
+      chapterXhtml(i + 1, name, i === 0 ? extra : '', i === 0 && footnote),
+    )
   })
   if (cover) files['OEBPS/cover.png'] = png(60, 90, cover)
   if (extra) files['OEBPS/evil.js'] = strToU8('window.top.__bookScriptRan = true')
-  return Buffer.from(zipSync(files))
+  // A fixed date: zip entries carry their modification time, and a book built twice has to
+  // come out byte for byte the same, since the library knows a book by its bytes' hash.
+  return Buffer.from(zipSync(files, { mtime: new Date('2026-01-01T00:00:00Z') }))
 }
 
 /** A three-page PDF with a title and an author in its document information. */
@@ -169,6 +182,11 @@ export const fixtures = {
       extra:
         '<script>window.top.__bookScriptRan = true</script><script src="evil.js"></script><img src="missing.png" onerror="window.top.__bookScriptRan = true"/><a id="js-link" href="javascript:window.top.__bookScriptRan = true">link</a>',
     }),
+  }),
+  annotated: (): FixtureFile => ({
+    name: 'annotated.epub',
+    mimeType: 'application/epub+zip',
+    buffer: epub({ title: 'An Annotated Book', author: 'Hugh Thomson', footnote: true }),
   }),
   text: (): FixtureFile => ({
     name: 'notes.txt',

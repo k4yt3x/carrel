@@ -12,9 +12,13 @@
       "primary": "generate_palette.py --base '#3d8667' --name primary --darkest 16 --cap 15 --extended",
       "neutral": "generate_palette.py --grey --temperature warm --extended --name neutral --grey-saturation 6 --darkest 18 --lightest 94",
       "danger": "generate_palette.py --base '#c53030' --toward cool --name danger",
-      "warning": "generate_palette.py --base '#c27c0e' --name warning"
+      "warning": "generate_palette.py --base '#c27c0e' --name warning",
+      "sepia": "generate_palette.py --base 'hsl(36, 28%, 50%)' --name sepia --extended --lightest 90 --darkest 22 --strength 0.25 --cap 8"
     },
-    "pairs-note": "Only real text-on-background pairs. Borders and dividers are not text."
+    "pairs-note": "Only real text-on-background pairs. Borders and dividers are not text.",
+    "sepia-note": "sepia.150 is hand-placed between 100 and 200 (hsl(44, 38%, 85%)): sunken and hover surfaces need a step darker than the page that still holds muted text above 4.5:1, and 200 does not.",
+    "track-note": "surface-track and surface-selected draw segmented controls: the selected segment has to stand out from its track in every theme, which surface-sunken and surface-raised do not in dark (both neutral.900).",
+    "font-note": "The sans stack names each platform's interface font instead of system-ui, which resolves to whatever font the desktop is set to (on Linux possibly a monospace face; on Windows with an East Asian display language, that locale's UI font)."
   },
   "primitive": {
     "color": {
@@ -45,6 +49,20 @@
         "900": "#332b29",
         "950": "#1d1716"
       },
+      "sepia": {
+        "50": "#f9f6ee",
+        "100": "#f0eadb",
+        "150": "#e7e0ca",
+        "200": "#ded4ba",
+        "300": "#cbbe9a",
+        "400": "#b7a47b",
+        "500": "#a3875c",
+        "600": "#8e6f4e",
+        "700": "#785a40",
+        "800": "#624832",
+        "900": "#4b3725",
+        "950": "#2b1e13"
+      },
       "danger": {
         "100": "#ffebf1",
         "200": "#ffadc9",
@@ -69,7 +87,7 @@
       }
     },
     "font": {
-      "sans": "system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif",
+      "sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'",
       "serif": "'Iowan Old Style', 'Palatino Linotype', Palatino, 'URW Palladio L', P052, 'Book Antiqua', Georgia, serif",
       "mono": "ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace"
     },
@@ -138,6 +156,8 @@
       "surface-raised": "{color.white}",
       "surface-sunken": "{color.neutral.100}",
       "surface-hover": "{color.neutral.100}",
+      "surface-track": "{color.neutral.100}",
+      "surface-selected": "{color.white}",
       "fg": "{color.neutral.900}",
       "fg-secondary": "{color.neutral.700}",
       "fg-muted": "{color.neutral.600}",
@@ -168,6 +188,8 @@
       "surface-raised": "{color.neutral.900}",
       "surface-sunken": "{color.neutral.900}",
       "surface-hover": "{color.neutral.800}",
+      "surface-track": "{color.neutral.950}",
+      "surface-selected": "{color.neutral.800}",
       "fg": "{color.neutral.200}",
       "fg-secondary": "{color.neutral.300}",
       "fg-muted": "{color.neutral.400}",
@@ -190,6 +212,38 @@
       "cover": "{color.primary.900}",
       "on-cover": "{color.primary.100}",
       "on-cover-muted": "{color.primary.200}"
+    }
+  },
+  "semantic-sepia": {
+    "color": {
+      "surface": "{color.sepia.100}",
+      "surface-raised": "{color.sepia.50}",
+      "surface-sunken": "{color.sepia.150}",
+      "surface-hover": "{color.sepia.150}",
+      "surface-track": "{color.sepia.150}",
+      "surface-selected": "{color.sepia.50}",
+      "fg": "{color.sepia.900}",
+      "fg-secondary": "{color.sepia.800}",
+      "fg-muted": "{color.sepia.700}",
+      "border": "{color.sepia.200}",
+      "border-strong": "{color.sepia.300}",
+      "action": "{color.primary.600}",
+      "action-hover": "{color.primary.700}",
+      "action-subtle": "{color.primary.100}",
+      "action-fg": "{color.primary.700}",
+      "on-action": "{color.white}",
+      "danger": "{color.danger.600}",
+      "danger-hover": "{color.danger.700}",
+      "danger-subtle": "{color.danger.100}",
+      "danger-fg": "{color.danger.700}",
+      "on-danger": "{color.white}",
+      "warning-subtle": "{color.warning.100}",
+      "warning-fg": "{color.warning.800}",
+      "focus": "{color.primary.500}",
+      "scrim": "{color.sepia.950}",
+      "cover": "{color.sepia.800}",
+      "on-cover": "{color.sepia.100}",
+      "on-cover-muted": "{color.sepia.200}"
     }
   },
   "pairs": [
@@ -362,6 +416,96 @@
       "name": "dark: placeholder cover author",
       "fg": "#b6eae1",
       "bg": "#104120"
+    },
+    {
+      "name": "sepia: body text on page",
+      "fg": "#4b3725",
+      "bg": "#f0eadb"
+    },
+    {
+      "name": "sepia: secondary text on page",
+      "fg": "#624832",
+      "bg": "#f0eadb"
+    },
+    {
+      "name": "sepia: muted text on page",
+      "fg": "#785a40",
+      "bg": "#f0eadb"
+    },
+    {
+      "name": "sepia: muted text on raised",
+      "fg": "#785a40",
+      "bg": "#f9f6ee"
+    },
+    {
+      "name": "sepia: muted text on sunken",
+      "fg": "#785a40",
+      "bg": "#e7e0ca"
+    },
+    {
+      "name": "sepia: body text on sunken",
+      "fg": "#4b3725",
+      "bg": "#e7e0ca"
+    },
+    {
+      "name": "sepia: primary button",
+      "fg": "#ffffff",
+      "bg": "#317553"
+    },
+    {
+      "name": "sepia: action text on page",
+      "fg": "#26643f",
+      "bg": "#f0eadb"
+    },
+    {
+      "name": "sepia: action text on raised",
+      "fg": "#26643f",
+      "bg": "#f9f6ee"
+    },
+    {
+      "name": "sepia: action text on sunken",
+      "fg": "#26643f",
+      "bg": "#e7e0ca"
+    },
+    {
+      "name": "sepia: selected item text",
+      "fg": "#26643f",
+      "bg": "#ebfffb"
+    },
+    {
+      "name": "sepia: danger text on raised",
+      "fg": "#981818",
+      "bg": "#f9f6ee"
+    },
+    {
+      "name": "sepia: placeholder cover title",
+      "fg": "#f0eadb",
+      "bg": "#624832"
+    },
+    {
+      "name": "sepia: placeholder cover author",
+      "fg": "#ded4ba",
+      "bg": "#624832"
+    },
+    {
+      "name": "dark: selected segment text",
+      "fg": "#d8d7cf",
+      "bg": "#48403d"
+    },
+    {
+      "name": "dark: segment text on track",
+      "fg": "#bdbbb2",
+      "bg": "#1d1716"
+    },
+    {
+      "name": "sepia: segment text on track",
+      "fg": "#624832",
+      "bg": "#e7e0ca"
+    },
+    {
+      "name": "light: segment text on track",
+      "fg": "#5d5550",
+      "bg": "#f3f2ed"
     }
   ]
 }

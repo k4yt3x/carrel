@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { type FixtureFile, fixtures } from './fixtures'
 
 const addBooks = (page: Page, ...files: FixtureFile[]) =>
-  page.locator('input[type="file"]').setInputFiles(files)
+  page.locator('input[type="file"][accept*=".epub"]').setInputFiles(files)
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')

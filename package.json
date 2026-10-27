@@ -19,6 +19,7 @@
     "design:emit": "node design/emit.ts && biome format --write src/styles/theme.css design/tokens.css"
   },
   "dependencies": {
+    "@zip.js/zip.js": "^2.24.0",
     "dexie": "^4.4.7",
     "dexie-react-hooks": "^4.4.0",
     "foliate-js": "github:readest/foliate-js#0c7a0edcda672218e958fb92b4cdf090d7ca9daa",
@@ -27,6 +28,7 @@
     "pdfjs-dist": "6.2.108",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "workbox-window": "^7.4.1",
     "zustand": "^5.0.16"
   },
   "devDependencies": {
@@ -44,6 +46,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
+    "vite-plugin-pwa": "^2.0.0",
     "vite-plugin-static-copy": "^4.1.1",
     "vitest": "^5.0.5"
   }

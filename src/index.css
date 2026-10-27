@@ -6,21 +6,25 @@
   themes: false;
   logs: false;
   include:
-    button, input, select, modal, loading, range, svg, properties, rootscrolllock, rootscrollgutter,
-    scrollbar;
+    button, input, select, textarea, toggle, modal, loading, range, svg, properties,
+    rootscrolllock, rootscrollgutter, scrollbar;
 }
 
 /*
  * daisyUI's theme contract, filled from the semantic tokens so its components draw from the
- * same system as everything else. The semantic tokens already switch with the colour scheme,
- * so one daisyUI theme serves both.
+ * same system as everything else. The semantic tokens already switch with the theme, so one
+ * daisyUI theme serves them all.
+ *
+ * base-200 is the fill of a default button and of disabled fields, which sit on raised
+ * surfaces (dialogs, sheets). surface-hover stands out from surface-raised in every theme;
+ * surface-sunken does not in dark, where the two are the same colour.
  */
 @plugin "daisyui/theme" {
   name: "carrel";
   default: true;
   color-scheme: light dark;
   --color-base-100: var(--color-surface-raised);
-  --color-base-200: var(--color-surface-sunken);
+  --color-base-200: var(--color-surface-hover);
   --color-base-300: var(--color-border);
   --color-base-content: var(--color-fg);
   --color-primary: var(--color-action);

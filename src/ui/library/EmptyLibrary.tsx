@@ -1,7 +1,7 @@
 import { BookOpen, Plus } from 'lucide-react'
 
 /** The first thing everyone sees: what Carrel holds, where it keeps it, and how to begin. */
-export function EmptyLibrary({ onAdd }: { onAdd(): void }) {
+export function EmptyLibrary({ onAdd, onRestore }: { onAdd(): void; onRestore(): void }) {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center py-24 text-center">
       <div className="grid size-16 place-items-center rounded-full bg-action-subtle text-action-fg">
@@ -19,6 +19,16 @@ export function EmptyLibrary({ onAdd }: { onAdd(): void }) {
         Add books
       </button>
       <p className="mt-4 text-sm text-fg-muted">or drop files anywhere on this page</p>
+      <p className="mt-12 text-sm text-fg-secondary">
+        Moving from another browser?{' '}
+        <button
+          type="button"
+          className="cursor-pointer font-semibold text-action-fg underline-offset-2 hover:underline"
+          onClick={onRestore}
+        >
+          Restore a backup
+        </button>
+      </p>
     </div>
   )
 }

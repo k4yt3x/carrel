@@ -7,15 +7,26 @@ leave your device. There are no accounts, no servers and no tracking.
 Carrel renders books with [Readest's fork of foliate-js](https://github.com/readest/foliate-js)
 and PDF.js.
 
+- Paged or scrolling layout, one or two columns, page-turn animations, full screen
+- Light, sepia and dark themes that the book pages follow
+- Type settings: typeface, size, line spacing, alignment, paragraph style, hyphenation,
+  spacing, margins, line length and custom CSS, for all books or for one book
+- Your own fonts, from files or from a link (Google Fonts, jsDelivr, cdnjs and the like)
+- Search within a book, footnotes in a popup, table of contents, running heads
+- Fit to page or width and facing pages for PDFs and comics
+- Backup and restore of the whole library, books included, as one zip file
+- Installable, and works offline once loaded
+
 ## Privacy
 
-The app is a set of static files. Once loaded, it talks to nothing but the site it came from.
-Its content security policy also stops books from running scripts or loading anything from the
-network, so a book can't phone home either.
+The app is a set of static files. Once loaded, it talks to nothing but the site it came from,
+except when you add a font from a link, which it downloads from that link. Its content security
+policy also stops books from running scripts or loading anything from the network, so a book
+can't phone home either.
 
 Browsers may clear a site's storage when space runs short, and Safari clears it for sites you
-haven't visited in a while. Carrel asks the browser to keep its storage, but keep the original
-files of books you care about.
+haven't visited in a while. Carrel asks the browser to keep its storage; back up the library
+from Settings, or keep the original files of books you care about.
 
 ## Development
 

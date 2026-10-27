@@ -11,8 +11,15 @@ export interface Navigator {
   turn(direction: Turn): void
   toggleChrome(): void
   hideChrome(): void
+  openSearch(): void
+  /** Zooms fixed-layout pages; false when the book has none, leaving the key to the browser. */
+  zoom(change: 'in' | 'out' | 'reset'): boolean
   /** True while something else (a dialog) owns the keyboard. */
   isBusy(): boolean
+  /** Whether taps on the sides of the page turn it; otherwise every tap toggles the controls. */
+  tapToTurn(): boolean
+  /** Whether the wheel turns pages; in scrolled layouts it scrolls instead. */
+  wheelTurns(): boolean
 }
 
 const editable = (target: EventTarget | null) =>
@@ -30,8 +37,28 @@ const keyTurns: Record<string, Turn> = {
   PageDown: 'next',
 }
 
+const zoomKeys: Record<string, 'in' | 'out' | 'reset'> = {
+  '+': 'in',
+  '=': 'in',
+  '-': 'out',
+  '0': 'reset',
+}
+
 export function handleKey(event: KeyboardEvent, navigator: Navigator): void {
-  if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
+  if (event.defaultPrevented) return
+  // The browser's own find can't see into book pages, so Ctrl+F searches the book instead.
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'f') {
+    event.preventDefault()
+    navigator.openSearch()
+    return
+  }
+  // Ctrl with + and - zooms the page of a PDF or comic rather than the whole app.
+  const zoom = zoomKeys[event.key]
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && zoom && navigator.zoom(zoom)) {
+    event.preventDefault()
+    return
+  }
+  if (event.ctrlKey || event.metaKey || event.altKey) return
   if (navigator.isBusy() || editable(event.target)) return
   let turn = keyTurns[event.key]
   if (event.key === ' ') turn = event.shiftKey ? 'prev' : 'next'
@@ -58,7 +85,7 @@ export function createWheelHandler(navigator: Navigator): (event: WheelEvent) =>
   let timer: ReturnType<typeof setTimeout> | undefined
   return (event) => {
     // Ctrl with the wheel is pinch-zoom on a trackpad.
-    if (event.ctrlKey || navigator.isBusy()) return
+    if (event.ctrlKey || navigator.isBusy() || !navigator.wheelTurns()) return
     clearTimeout(timer)
     timer = setTimeout(() => {
       locked = false
@@ -72,7 +99,8 @@ export function createWheelHandler(navigator: Navigator): (event: WheelEvent) =>
 
 /**
  * Taps on the outer thirds of the screen turn the page that way; a tap in the middle shows
- * or hides the reader's controls. `x` is the tap's position in the app's viewport.
+ * or hides the reader's controls. `x` is the tap's position in the app's viewport. Taps on
+ * links and controls are theirs, not the reader's.
  */
 export function handleTap(event: MouseEvent, x: number, navigator: Navigator): void {
   if (event.defaultPrevented || event.button !== 0 || navigator.isBusy()) return
@@ -80,7 +108,8 @@ export function handleTap(event: MouseEvent, x: number, navigator: Navigator): v
   const selection = (event.view ?? window).getSelection()
   if (selection && !selection.isCollapsed) return
   const position = x / window.innerWidth
-  if (position < 1 / 3) navigator.turn('left')
+  if (!navigator.tapToTurn()) navigator.toggleChrome()
+  else if (position < 1 / 3) navigator.turn('left')
   else if (position > 2 / 3) navigator.turn('right')
   else navigator.toggleChrome()
 }

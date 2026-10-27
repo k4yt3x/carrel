@@ -72,7 +72,8 @@ export interface ImportOptions {
   onProgress?: (done: number) => void
 }
 
-const isQuotaError = (error: unknown) =>
+/** Whether an error is the browser refusing a write for lack of storage space. */
+export const isQuotaError = (error: unknown) =>
   error instanceof Dexie.QuotaExceededError ||
   (error instanceof DOMException && error.name === 'QuotaExceededError')
 
@@ -134,7 +135,7 @@ export async function importFiles(
  * Asks the browser not to evict the library under storage pressure. Browsers decide by
  * themselves whether to grant it, and asking again after a grant is harmless.
  */
-async function requestPersistentStorage(): Promise<void> {
+export async function requestPersistentStorage(): Promise<void> {
   try {
     if (navigator.storage && !(await navigator.storage.persisted())) {
       await navigator.storage.persist()
@@ -146,11 +147,9 @@ async function requestPersistentStorage(): Promise<void> {
 
 /** Deletes a book and everything stored with it. */
 export async function removeBook(id: string): Promise<void> {
-  await db.transaction('rw', db.books, db.files, db.covers, db.progress, async () => {
-    await db.books.delete(id)
-    await db.files.delete(id)
-    await db.covers.delete(id)
-    await db.progress.delete(id)
+  const tables = [db.books, db.files, db.covers, db.progress, db.bookSettings]
+  await db.transaction('rw', tables, async () => {
+    await Promise.all(tables.map((table) => table.delete(id)))
   })
 }
 

@@ -1,15 +1,19 @@
-import { Ellipsis, Trash2 } from 'lucide-react'
+import { Download, Ellipsis, Trash2 } from 'lucide-react'
 import { type ToggleEvent, useId, useRef } from 'react'
 
 interface BookMenuProps {
   title: string
+  onDownload(): void
   onRemove(): void
 }
 
 const gap = 4
 
+const item =
+  'flex w-full items-center gap-3 rounded-md px-3 py-2 text-start text-sm hover:bg-surface-hover focus-visible:bg-surface-hover'
+
 /** The actions on one book, kept behind a button so the shelf shows books rather than controls. */
-export function BookMenu({ title, onRemove }: BookMenuProps) {
+export function BookMenu({ title, onDownload, onRemove }: BookMenuProps) {
   const id = useId()
   const button = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
@@ -55,7 +59,18 @@ export function BookMenu({ title, onRemove }: BookMenuProps) {
       >
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-start text-sm text-danger-fg hover:bg-surface-hover focus-visible:bg-surface-hover"
+          className={item}
+          onClick={() => {
+            menu.current?.hidePopover()
+            onDownload()
+          }}
+        >
+          <Download aria-hidden className="size-4 text-fg-muted" />
+          Download file
+        </button>
+        <button
+          type="button"
+          className={`${item} text-danger-fg`}
           onClick={() => {
             menu.current?.hidePopover()
             onRemove()

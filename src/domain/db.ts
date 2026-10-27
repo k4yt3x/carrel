@@ -11,6 +11,7 @@
  */
 
 import Dexie, { type EntityTable } from 'dexie'
+import type { ReadingSettings } from '@/domain/settings'
 
 export interface Book {
   /** SHA-256 of the file's bytes, lowercase hex. Importing the same file again finds it. */
@@ -48,11 +49,41 @@ export interface Progress {
   updatedAt: number
 }
 
+/** A book's own reading settings, which replace the shared ones for that book. */
+export interface BookSettings {
+  id: string
+  settings: ReadingSettings
+}
+
+export interface FontFile {
+  data: Blob
+  format: 'woff2' | 'woff' | 'truetype' | 'opentype'
+  /** CSS font-weight descriptor, such as '400' or '100 900' for a variable font. */
+  weight: string
+  /** CSS font-style descriptor: 'normal', 'italic' or 'oblique'. */
+  style: string
+  /** CSS unicode-range descriptor, for fonts split into ranges; null when the file covers all. */
+  unicodeRange: string | null
+}
+
+/** A typeface the reader added, made of one or more font files. */
+export interface Font {
+  id: string
+  /** The name shown to the reader. Books refer to the font by `id`, never by this name. */
+  family: string
+  /** Where it came from: the file names, or the URL it was downloaded from. */
+  source: string
+  addedAt: number
+  files: FontFile[]
+}
+
 export const db = new Dexie('carrel') as Dexie & {
   books: EntityTable<Book, 'id'>
   files: EntityTable<BookFile, 'id'>
   covers: EntityTable<Cover, 'id'>
   progress: EntityTable<Progress, 'id'>
+  bookSettings: EntityTable<BookSettings, 'id'>
+  fonts: EntityTable<Font, 'id'>
 }
 
 db.version(1).stores({
@@ -60,4 +91,9 @@ db.version(1).stores({
   files: 'id',
   covers: 'id',
   progress: 'id',
+})
+
+db.version(2).stores({
+  bookSettings: 'id',
+  fonts: 'id, family',
 })

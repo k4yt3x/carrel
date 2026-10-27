@@ -3,11 +3,15 @@
  *
  * - src/styles/theme.css: the Tailwind v4 theme. It resets Tailwind's own scales first so
  *   that only the system's values exist as utilities, then declares primitives, then the
- *   semantic layer (light), then the dark remap of the semantic layer.
+ *   semantic layer (light), then the remaps of the semantic layer for the other themes.
  * - design/tokens.css: the same tokens as framework-neutral custom properties.
  *
  * Semantic tokens reference primitives with var() rather than repeating hex values, so a
- * primitive has exactly one definition and the dark remap only names different primitives.
+ * primitive has exactly one definition and a theme's remap only names different primitives.
+ *
+ * Themes: with no `data-theme` on the root element the page follows the system's colour
+ * scheme; `data-theme="light"`, `"sepia"` or `"dark"` pins one. The app sets the attribute
+ * from the reader's choice before the first paint (public/theme-boot.js).
  *
  * Run with `pnpm design:emit` after editing the JSON.
  */
@@ -21,6 +25,7 @@ interface Tokens {
   primitive: TokenTree
   semantic: TokenTree
   'semantic-dark': TokenTree
+  'semantic-sepia': TokenTree
 }
 
 const root = new URL('..', import.meta.url)
@@ -50,12 +55,21 @@ function checkReferences(pairs: [string, string][], defined: Set<string>): void 
   }
 }
 
+/** Fails the run when a theme leaves out a semantic token, which would leak the light value. */
+function checkComplete(theme: string, pairs: [string, string][], light: [string, string][]) {
+  const names = new Set(pairs.map(([name]) => name))
+  const missing = light.map(([name]) => name).filter((name) => !names.has(name))
+  if (missing.length > 0) throw new Error(`${theme} does not define ${missing.join(', ')}`)
+}
+
 const primitives = flatten(tokens.primitive)
 const light = flatten(tokens.semantic)
 const dark = flatten(tokens['semantic-dark'])
+const sepia = flatten(tokens['semantic-sepia'])
 const defined = new Set(primitives.map(([name]) => name))
-checkReferences(light, defined)
-checkReferences(dark, defined)
+for (const pairs of [light, dark, sepia]) checkReferences(pairs, defined)
+checkComplete('semantic-dark', dark, light)
+checkComplete('semantic-sepia', sepia, light)
 
 const declare = (pairs: [string, string][], indent: string) =>
   pairs.map(([name, value]) => `${indent}--${name}: ${value};`).join('\n')
@@ -82,7 +96,35 @@ const resets = [
   '--drop-shadow-*: initial;',
 ]
 
-// `static` emits every variable whether or not a utility uses it: the dark remap and the
+// The light values sit in the base declaration; these blocks remap the semantic layer. Each
+// pinned theme also pins `color-scheme`, so form controls and scrollbars match it rather than
+// the system.
+const themeBlocks = `:root {
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+${declare(dark, '    ')}
+  }
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='sepia'] {
+  color-scheme: light;
+${declare(sepia, '  ')}
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+${declare(dark, '  ')}
+}
+`
+
+// `static` emits every variable whether or not a utility uses it: the theme remaps and the
 // reader (which reads computed values to style book pages) both refer to them.
 const theme = `${header}
 @theme static {
@@ -93,12 +135,7 @@ ${declare(primitives, '  ')}
 ${declare(light, '  ')}
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-${declare(dark, '    ')}
-  }
-}
-`
+${themeBlocks}`
 
 const neutral = `${header}
 :root {
@@ -107,12 +144,7 @@ ${declare(primitives, '  ')}
 ${declare(light, '  ')}
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-${declare(dark, '    ')}
-  }
-}
-`
+${themeBlocks}`
 
 writeFileSync(new URL('src/styles/theme.css', root), theme)
 writeFileSync(new URL('design/tokens.css', root), neutral)

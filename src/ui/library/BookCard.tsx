@@ -25,7 +25,7 @@ const binding =
  * covers shares a baseline, as books on a shelf do. A book without a cover gets a cloth
  * binding with its title stamped on it.
  */
-function Cover({ book }: { book: Book }) {
+function Cover({ book, compact = false }: { book: Book; compact?: boolean }) {
   // undefined while the query runs, null once it has found no cover
   const cover = useLiveQuery(async () => (await db.covers.get(book.id)) ?? null, [book.id])
   const url = useObjectUrl(cover?.image)
@@ -44,11 +44,16 @@ function Cover({ book }: { book: Book }) {
   if (cover !== null) return null
   return (
     <div className={`${binding} flex size-full flex-col justify-between bg-cover p-3`}>
-      <p className="line-clamp-5 font-serif text-sm font-semibold leading-tight text-on-cover">
-        {book.title}
-      </p>
-      {book.authors.length > 0 && (
-        <p className="line-clamp-2 text-xs text-on-cover-muted">{book.authors[0]}</p>
+      {/* A thumbnail is too small to stamp; the cloth alone marks it as a book. */}
+      {!compact && (
+        <>
+          <p className="line-clamp-5 font-serif text-sm font-semibold leading-tight text-on-cover">
+            {book.title}
+          </p>
+          {book.authors.length > 0 && (
+            <p className="line-clamp-2 text-xs text-on-cover-muted">{book.authors[0]}</p>
+          )}
+        </>
       )}
     </div>
   )
@@ -57,10 +62,11 @@ function Cover({ book }: { book: Book }) {
 interface BookCardProps {
   book: Book
   fraction: number | undefined
+  onDownload(book: Book): void
   onRemove(book: Book): void
 }
 
-export function BookCard({ book, fraction, onRemove }: BookCardProps) {
+export function BookCard({ book, fraction, onDownload, onRemove }: BookCardProps) {
   return (
     // The progress row sits at the bottom of every card, so a row of books keeps one line for
     // it however many lines their titles take.
@@ -84,9 +90,51 @@ export function BookCard({ book, fraction, onRemove }: BookCardProps) {
       <div className="mt-auto flex h-8 items-center justify-between">
         <span className="text-xs text-fg-muted">{progressLabel(fraction)}</span>
         <div className="-me-2">
-          <BookMenu title={book.title} onRemove={() => onRemove(book)} />
+          <BookMenu
+            title={book.title}
+            onDownload={() => onDownload(book)}
+            onRemove={() => onRemove(book)}
+          />
         </div>
       </div>
+    </li>
+  )
+}
+
+/**
+ * The same book as a row of a list, for libraries scanned by title and author rather than by
+ * cover. The cover shrinks to a thumbnail that still says which book it is.
+ */
+export function BookRow({ book, fraction, onDownload, onRemove }: BookCardProps) {
+  const progress = progressLabel(fraction)
+  return (
+    <li className="flex items-center gap-2 py-2">
+      <a
+        href={readerHref(book.id)}
+        className="group flex min-w-0 flex-1 items-center gap-4 rounded-md focus-visible:outline-offset-2"
+      >
+        <div className="flex aspect-2/3 w-12 shrink-0 items-end justify-center">
+          <Cover book={book} compact />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-fg group-hover:text-action-fg">
+            {book.title}
+          </p>
+          {book.authors.length > 0 && (
+            <p className="mt-1 truncate text-sm text-fg-secondary">
+              {listFormat.format(book.authors)}
+            </p>
+          )}
+        </div>
+        <span className="w-16 shrink-0 text-end text-xs text-fg-muted tabular-nums">
+          {progress}
+        </span>
+      </a>
+      <BookMenu
+        title={book.title}
+        onDownload={() => onDownload(book)}
+        onRemove={() => onRemove(book)}
+      />
     </li>
   )
 }

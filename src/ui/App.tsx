@@ -1,7 +1,10 @@
 import { useSyncExternalStore } from 'react'
 import { parseRoute } from '@/domain/routes'
 import { LibraryPage } from '@/ui/library/LibraryPage'
+import { UpdateNotice } from '@/ui/library/UpdateNotice'
 import { ReaderPage } from '@/ui/reader/ReaderPage'
+import { useLaunchFiles } from '@/ui/useLaunchFiles'
+import { useThemeEffect } from '@/ui/useTheme'
 
 const subscribe = (onChange: () => void) => {
   window.addEventListener('hashchange', onChange)
@@ -11,7 +14,17 @@ const subscribe = (onChange: () => void) => {
 const getHash = () => window.location.hash
 
 export function App() {
+  useThemeEffect()
+  useLaunchFiles()
   const route = parseRoute(useSyncExternalStore(subscribe, getHash))
-  if (route.name === 'reader') return <ReaderPage key={route.bookId} bookId={route.bookId} />
-  return <LibraryPage />
+  return (
+    <>
+      {route.name === 'reader' ? (
+        <ReaderPage key={route.bookId} bookId={route.bookId} />
+      ) : (
+        <LibraryPage />
+      )}
+      <UpdateNotice shown={route.name === 'library'} />
+    </>
+  )
 }

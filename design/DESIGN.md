@@ -22,15 +22,23 @@ and the current place in a list, and little else.
 ## Colour
 
 Components use **semantic tokens only**. They never name a hue (`bg-primary-600` is wrong in a
-component; `bg-action` is right). The semantic layer is what dark mode remaps, so a component
-written against it is correct in both schemes for free.
+component; `bg-action` is right). The semantic layer is what each theme remaps, so a component
+written against it is correct in every theme for free.
+
+There are three palettes: light (the base declaration), sepia and dark (`semantic-sepia` and
+`semantic-dark` in the JSON). The reader picks System, Light, Sepia or Dark; `emit.ts` keys the
+remaps on `data-theme` on the root element, and with no attribute the page follows the
+system's colour scheme. `public/theme-boot.js` sets the attribute before the first paint, so a
+pinned theme never flashes the system's. The one exception to semantic-only is the theme
+picker, whose swatches show each palette's own primitives side by side.
 
 | Token                                 | Use                                                                             |
 | ------------------------------------- | ------------------------------------------------------------------------------- |
 | `surface`                             | The page.                                                                       |
 | `surface-raised`                      | Anything that floats above the page: dialogs, menus, toasts, the reader's bars. |
 | `surface-sunken`                      | Inputs and other wells.                                                         |
-| `surface-hover`                       | Hover and pressed rows in lists and menus.                                      |
+| `surface-hover`                       | Hover and pressed rows in lists and menus; the fill of a default button.        |
+| `surface-track`, `surface-selected`   | A segmented control's track and its selected segment.                           |
 | `fg`, `fg-secondary`, `fg-muted`      | The three text tiers. See Typography.                                           |
 | `border`, `border-strong`             | Dividers and field edges. Prefer space or a background change first.            |
 | `action`, `action-hover`, `on-action` | The primary button and its text.                                                |
@@ -44,17 +52,24 @@ written against it is correct in both schemes for free.
 
 Every text pair the interface produces is listed under `pairs` in `design-tokens.json` and
 checked against WCAG (4.5:1 for normal text) with the skill's `check_contrast.py`. All pass in
-both schemes. Add the pair there when a new combination appears.
+every theme. Add the pair there when a new combination appears.
 
 **Shades are fixed.** Adjusting an existing stop is fine; adding stops is how a palette falls
 apart. The ramps were generated with `generate_palette.py`; the commands are recorded in the
-JSON's `$meta.generated`.
+JSON's `$meta.generated`. The one added stop, `sepia.150`, is recorded in `$meta.sepia-note`:
+sepia's sunken surfaces needed a step between 100 and 200 that still holds muted text.
 
 ## Typography
 
 - **Type scale:** 12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72 px. These are the only sizes.
   Interface text is 14 px; secondary details 12 px; dialog titles 18 px; the wordmark and
   empty-state heading 24 px.
+- **Typefaces:** the interface is set in each platform's own interface font (San Francisco,
+  Segoe UI, Noto Sans), named one by one rather than through `system-ui`. `system-ui` is the
+  font the desktop is set to, which on Linux can be anything, a monospace face included, and
+  on Windows with an East Asian display language is that locale's UI font. Where none of the
+  named fonts exists, the browser's own sans-serif takes over. The wordmark, the empty
+  library's heading, the theme swatches and the cloth covers use the serif stack.
 - **Two weights:** 400 for reading and 600 for emphasis. Nothing lighter than 400.
 - **Three text colours:** `fg` for what matters, `fg-secondary` for supporting text, `fg-muted`
   for metadata. A fourth is never needed; if it seems to be, the hierarchy is wrong.
@@ -101,9 +116,16 @@ Dialogs and menus use the browser's top layer.
 ## Actions
 
 One primary action per screen, filled with `action`: "Add books" in the library. Secondary
-actions are outlined or sunken fields (search, sort). Tertiary actions are ghost buttons and
-icons (the per-book menu, the reader's controls). A destructive action is tertiary where it
-is offered (red text in a menu) and only becomes loud in the dialog that confirms it.
+actions are default buttons (filled with `surface-hover`) or sunken fields (search, sort).
+Tertiary actions are ghost buttons and icons (the per-book menu, the reader's controls). A
+destructive action is tertiary where it is offered (red text in a menu) and only becomes loud
+in the dialog that confirms it. Settings have no single primary action, so every button in
+them is a default button; the one exception is the Restore button inside the confirmation
+that appears once a backup has been checked.
+
+Settings controls come from `src/ui/controls.tsx`: `Segmented` for two to four choices,
+`Slider` for a number with its value shown, `Switch` for on and off (with a one-line
+description of what "on" means), each a native control underneath.
 
 ## Motion and focus
 
@@ -116,17 +138,34 @@ is offered (red text in a menu) and only becomes loud in the dialog that confirm
 ## The reader
 
 The book page takes its colours from the same semantic tokens (`surface`, `fg`, `action-fg`),
-so it always matches the interface around it. In the light scheme a book keeps its own text
-colours; in the dark scheme they are overridden, because books set for paper are often black
-on black otherwise.
+so it always matches the interface around it, and the page background is always the theme's.
+In light themes a book keeps its own text colours unless the reader turns that off; in the dark
+theme they are overridden, because books set for paper are often black on black otherwise.
+
+Panels open from the side on wide screens and rise from the bottom on narrow ones
+(`src/ui/Sheet.tsx`). Reading settings leave the page undimmed, since their effect is the
+point; contents and search dim it. Footnotes open in a card over the page rather than jumping
+to the note.
 
 Running heads (book title on the left page, chapter on the right) and the progress folio sit
 in the page margins in 12 px `fg-muted`, as in a printed book. The controls stay hidden until
 asked for, and step aside a few seconds after the book opens.
 
-## What is not in the system yet
+## Icons
 
-Reading themes beyond light and dark, reading fonts and type settings, and their controls.
+`public/favicon.svg` is the icon; `design/icon-maskable.svg` is its full-bleed variant for
+platforms that crop icons to their own shape. The PNGs in `public/icons/` are rendered from
+them:
+
+```sh
+rsvg-convert -w 192 -h 192 public/favicon.svg -o public/icons/icon-192.png
+rsvg-convert -w 512 -h 512 public/favicon.svg -o public/icons/icon-512.png
+rsvg-convert -w 512 -h 512 design/icon-maskable.svg -o public/icons/maskable-512.png
+rsvg-convert -w 180 -h 180 design/icon-maskable.svg -o public/icons/apple-touch-icon.png
+```
+
+## Adding to the system
+
 When something needs a value the system lacks, add a token to `design-tokens.json` on
 purpose, add any new text pair to `pairs`, and re-run the contrast check. Don't write a
 one-off value in a component.

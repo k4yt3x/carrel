@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { type FixtureFile, fixtures } from './fixtures'
 
 const addBooks = async (page: Page, ...files: FixtureFile[]) => {
-  await page.locator('input[type="file"]').setInputFiles(files)
+  await page.locator('input[type="file"][accept*=".epub"]').setInputFiles(files)
   await expect(page.getByRole('status')).toContainText('Added')
 }
 

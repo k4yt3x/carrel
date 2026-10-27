@@ -65,15 +65,47 @@ declare module 'foliate-js/view.js' {
     feet?: HTMLElement[] | null
     /** One string goes after the book's own styles; a pair goes before and after them. */
     setStyles?(css: string | [before: string, after: string]): void
+    /** The documents on screen; fixed-layout renderers have none to give. */
+    getContents?(): { doc: Document; index: number }[]
     next(): Promise<void>
     prev(): Promise<void>
+  }
+
+  /** An internal link was followed; cancelling the event keeps the view where it is. */
+  export interface LinkDetail {
+    a: HTMLAnchorElement
+    href: string
   }
 
   export interface ViewEventMap extends HTMLElementEventMap {
     relocate: CustomEvent<RelocateDetail>
     load: CustomEvent<LoadDetail>
     'external-link': CustomEvent<ExternalLinkDetail>
+    link: CustomEvent<LinkDetail>
   }
+
+  export interface SearchOptions {
+    query: string
+    matchCase?: boolean
+    matchDiacritics?: boolean
+    matchWholeWords?: boolean
+    /** Searches one section only. */
+    index?: number
+  }
+
+  export interface SearchMatch {
+    cfi: string
+    excerpt: { pre: string; match: string; post: string }
+  }
+
+  /**
+   * What `View.search` yields while it works through the book: how far it has got, the
+   * matches in one section (labelled with that section's chapter), and finally 'done'.
+   */
+  export type SearchEvent =
+    | { progress: number }
+    | { index: number; label: string; subitems: SearchMatch[] }
+    | 'done'
 
   export interface View extends HTMLElement {
     book: Book
@@ -88,6 +120,9 @@ declare module 'foliate-js/view.js' {
     next(): Promise<void>
     goLeft(): Promise<void>
     goRight(): Promise<void>
+    /** Searches the text and highlights what it finds, until `clearSearch`. */
+    search(options: SearchOptions): AsyncGenerator<SearchEvent>
+    clearSearch(): void
     addEventListener<K extends keyof ViewEventMap>(
       type: K,
       listener: (this: View, event: ViewEventMap[K]) => void,
@@ -98,5 +133,53 @@ declare module 'foliate-js/view.js' {
       listener: EventListenerOrEventListenerObject,
       options?: boolean | AddEventListenerOptions,
     ): void
+  }
+}
+
+declare module 'foliate-js/footnotes.js' {
+  import type { Book, LinkDetail, View } from 'foliate-js/view.js'
+
+  export interface FootnoteRenderDetail {
+    /** A view of its own showing just the note, ready to be placed in a popup. */
+    view: View
+    href: string
+    /** 'footnote', 'endnote', 'note', 'definition', 'biblioentry' or null when unknown. */
+    type: string | null
+    /** Whether the note is hidden in the text, so following the link would show nothing. */
+    hidden: boolean
+  }
+
+  export interface FootnoteHandlerEventMap {
+    'before-render': CustomEvent<{ view: View }>
+    render: CustomEvent<FootnoteRenderDetail>
+  }
+
+  /** Recognises links to footnotes and renders the note in a view of its own. */
+  export class FootnoteHandler extends EventTarget {
+    detectFootnotes: boolean
+    /**
+     * Takes a view's 'link' event. For a note it cancels the event and returns a promise that
+     * settles once 'render' has fired; for any other link it returns undefined.
+     */
+    handle(book: Book, event: CustomEvent<LinkDetail>): Promise<void> | undefined
+    addEventListener<K extends keyof FootnoteHandlerEventMap>(
+      type: K,
+      listener: (event: FootnoteHandlerEventMap[K]) => void,
+      options?: boolean | AddEventListenerOptions,
+    ): void
+  }
+}
+
+declare module 'foliate-js/overlayer.js' {
+  export interface OutlineOptions {
+    color?: string
+    width?: number
+    padding?: number
+    radius?: number
+  }
+
+  /** Draws marks over a page (a class of static drawing functions); the view uses `outline` for search matches. */
+  export const Overlayer: {
+    outline(rects: unknown, options?: OutlineOptions): SVGElement
   }
 }

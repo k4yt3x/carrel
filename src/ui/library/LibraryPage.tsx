@@ -7,26 +7,29 @@
  *   secondary  author, reading progress
  *   tertiary   search, sort, the per-book menu
  * Actions: one primary, "Add books" (in the empty state it is the page's only action, so
- *   the header copy is hidden there); search and sort are secondary; removing a book is
- *   tertiary and sits behind each book's menu.
+ *   the header copy is hidden there); search, sort and the covers/list switch are secondary;
+ *   downloading and removing a book are tertiary and sit behind each book's menu; settings
+ *   (theme, fonts, backup, storage) are a quiet icon at the end of the header.
  * Tokens: page bg-surface; text tiers fg / fg-secondary / fg-muted; weights 400 and 600;
  *   covers radius-sm with shadow-md, raised to shadow-lg on hover; grid gaps 24/32 across
  *   and 48 down, so a cover sits closer to its own caption than to the row below.
  */
 
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus, Search } from 'lucide-react'
+import { LayoutGrid, List, Plus, Search, Settings } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { arrangeBooks, isSortOrder, type SortOrder } from '@/domain/arrange'
 import { type Book, db } from '@/domain/db'
-import { bookExtensions, removeBook } from '@/domain/library'
+import { bookExtensions, loadBookFile, removeBook } from '@/domain/library'
 import { useImports } from '@/store/imports'
 import { useLibraryView } from '@/store/libraryView'
 import { ConfirmDialog } from '@/ui/ConfirmDialog'
-import { BookCard } from '@/ui/library/BookCard'
+import { downloadFile } from '@/ui/download'
+import { BookCard, BookRow } from '@/ui/library/BookCard'
 import { DropOverlay } from '@/ui/library/DropOverlay'
 import { EmptyLibrary } from '@/ui/library/EmptyLibrary'
 import { ImportNotice } from '@/ui/library/ImportNotice'
+import { LibrarySettings } from '@/ui/library/LibrarySettings'
 
 const sortLabels: Record<SortOrder, string> = {
   recent: 'Recently read',
@@ -43,9 +46,13 @@ export function LibraryPage() {
   )
   const sort = useLibraryView((state) => state.sort)
   const setSort = useLibraryView((state) => state.setSort)
+  const layout = useLibraryView((state) => state.layout)
+  const setLayout = useLibraryView((state) => state.setLayout)
   const addFiles = useImports((state) => state.add)
   const [query, setQuery] = useState('')
   const [removing, setRemoving] = useState<Book | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [downloadFailed, setDownloadFailed] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const shown = useMemo(() => arrangeBooks(books ?? [], sort, query), [books, sort, query])
@@ -58,10 +65,29 @@ export function LibraryPage() {
 
   const hasBooks = books !== undefined && books.length > 0
 
+  const download = async (book: Book) => {
+    setDownloadFailed(null)
+    try {
+      const file = await loadBookFile(book.id)
+      if (!file) throw new Error(`no file stored for ${book.id}`)
+      downloadFile(file, file.name)
+    } catch (error) {
+      console.error('could not download the book', error)
+      setDownloadFailed(book.title)
+    }
+  }
+  const Item = layout === 'list' ? BookRow : BookCard
+
+  useEffect(() => {
+    if (!downloadFailed) return
+    const timer = setTimeout(() => setDownloadFailed(null), 6000)
+    return () => clearTimeout(timer)
+  }, [downloadFailed])
+
   return (
     <div className="min-h-dvh bg-surface">
       <header className="mx-auto max-w-7xl px-4 pt-6 pb-8 sm:px-8 sm:pt-8">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-4 sm:gap-x-6">
           <h1 className="font-serif text-2xl font-semibold tracking-tight text-fg">Carrel</h1>
           {hasBooks && (
             <>
@@ -91,17 +117,50 @@ export function LibraryPage() {
                   ))}
                 </select>
               </div>
-              <button type="button" className="btn btn-primary ms-auto sm:ms-0" onClick={pickFiles}>
+              <fieldset className="ms-auto flex rounded-md bg-surface-track p-1 sm:ms-0">
+                <legend className="sr-only">Show books as</legend>
+                {(
+                  [
+                    ['grid', 'Covers', LayoutGrid],
+                    ['list', 'List', List],
+                  ] as const
+                ).map(([value, label, Icon]) => (
+                  <label key={value} title={label}>
+                    <input
+                      type="radio"
+                      name="library-layout"
+                      className="peer sr-only"
+                      checked={layout === value}
+                      aria-label={label}
+                      onChange={() => setLayout(value)}
+                    />
+                    <span className="grid size-8 cursor-pointer place-items-center rounded-sm text-fg-muted hover:text-fg peer-checked:bg-surface-selected peer-checked:text-fg peer-checked:shadow-sm peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus">
+                      <Icon aria-hidden className="size-4" />
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+              <button type="button" className="btn btn-primary" onClick={pickFiles}>
                 <Plus aria-hidden className="size-4" />
                 Add books
               </button>
             </>
           )}
+          <button
+            type="button"
+            className={`btn btn-ghost btn-square -me-2 ${hasBooks ? '' : 'ms-auto'}`}
+            aria-label="Settings"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings aria-hidden className="size-6" />
+          </button>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 pb-24 sm:px-8">
-        {books !== undefined && books.length === 0 && <EmptyLibrary onAdd={pickFiles} />}
+        {books !== undefined && books.length === 0 && (
+          <EmptyLibrary onAdd={pickFiles} onRestore={() => setSettingsOpen(true)} />
+        )}
         {hasBooks && shown.length === 0 && (
           <div className="py-24 text-center">
             <p className="text-fg">No books match “{query}”.</p>
@@ -115,16 +174,31 @@ export function LibraryPage() {
           </div>
         )}
         {shown.length > 0 && (
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(var(--spacing-32),1fr))] gap-x-6 gap-y-12 sm:gap-x-8">
+          <ul
+            className={
+              layout === 'list'
+                ? 'max-w-3xl divide-y divide-border'
+                : 'grid grid-cols-[repeat(auto-fill,minmax(var(--spacing-32),1fr))] gap-x-6 gap-y-12 sm:gap-x-8'
+            }
+          >
             {shown.map((book) => (
-              <BookCard
+              <Item
                 key={book.id}
                 book={book}
                 fraction={progress?.get(book.id)}
+                onDownload={download}
                 onRemove={setRemoving}
               />
             ))}
           </ul>
+        )}
+        {downloadFailed && (
+          <p
+            role="alert"
+            className="fixed inset-x-4 bottom-6 z-60 mx-auto max-w-sm rounded-lg bg-danger-subtle px-4 py-3 text-center text-sm text-danger-fg shadow-lg"
+          >
+            “{downloadFailed}” couldn’t be downloaded. Try again.
+          </p>
         )}
       </main>
 
@@ -141,6 +215,7 @@ export function LibraryPage() {
       />
       <DropOverlay onDrop={onDrop} />
       <ImportNotice />
+      <LibrarySettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <ConfirmDialog
         open={removing !== null}
         title={`Remove “${removing?.title ?? ''}”?`}

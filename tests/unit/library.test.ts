@@ -8,6 +8,7 @@ import {
   removeBook,
   saveProgress,
 } from '@/domain/library'
+import { defaultReadingSettings } from '@/domain/settings'
 
 const inspection = (title: string): Inspection => ({
   title,
@@ -92,16 +93,18 @@ describe('importFiles', () => {
 })
 
 describe('removeBook', () => {
-  it('deletes the book with its file, cover and reading position', async () => {
+  it('deletes the book with its file, cover, reading position and settings', async () => {
     const outcome = await importFiles([book('alpha')], {
       inspect: async () => inspection('Alpha'),
     })
     const id = outcome.added[0]?.id ?? ''
     await saveProgress({ id, location: 'epubcfi(/6/4!/4/2)', fraction: 0.5 })
+    await db.bookSettings.put({ id, settings: defaultReadingSettings })
     await removeBook(id)
     expect(await db.books.get(id)).toBeUndefined()
     expect(await db.files.get(id)).toBeUndefined()
     expect(await db.covers.get(id)).toBeUndefined()
     expect(await db.progress.get(id)).toBeUndefined()
+    expect(await db.bookSettings.get(id)).toBeUndefined()
   })
 })
