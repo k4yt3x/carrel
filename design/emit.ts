@@ -10,8 +10,10 @@
  * primitive has exactly one definition and a theme's remap only names different primitives.
  *
  * Themes: with no `data-theme` on the root element the page follows the system's colour
- * scheme; `data-theme="light"`, `"sepia"` or `"dark"` pins one. The app sets the attribute
- * from the reader's choice before the first paint (public/theme-boot.js).
+ * scheme; `data-theme="light"` or `"dark"` pins one. `data-theme="custom"` is a theme
+ * the reader made: its colours come in as --custom-background, --custom-text and --custom-link
+ * on the root element, and `data-scheme` says whether it is light or dark. The app sets all of
+ * these from the reader's choice before the first paint (public/theme-boot.js).
  *
  * Run with `pnpm design:emit` after editing the JSON.
  */
@@ -25,7 +27,8 @@ interface Tokens {
   primitive: TokenTree
   semantic: TokenTree
   'semantic-dark': TokenTree
-  'semantic-sepia': TokenTree
+  'semantic-custom-light': TokenTree
+  'semantic-custom-dark': TokenTree
 }
 
 const root = new URL('..', import.meta.url)
@@ -65,11 +68,15 @@ function checkComplete(theme: string, pairs: [string, string][], light: [string,
 const primitives = flatten(tokens.primitive)
 const light = flatten(tokens.semantic)
 const dark = flatten(tokens['semantic-dark'])
-const sepia = flatten(tokens['semantic-sepia'])
-const defined = new Set(primitives.map(([name]) => name))
-for (const pairs of [light, dark, sepia]) checkReferences(pairs, defined)
+const customLight = flatten(tokens['semantic-custom-light'])
+const customDark = flatten(tokens['semantic-custom-dark'])
+// A custom theme's three colours are set on the root element at run time (useTheme.ts).
+const runtime = ['custom-background', 'custom-text', 'custom-link']
+const defined = new Set([...primitives.map(([name]) => name), ...runtime])
+for (const pairs of [light, dark, customLight, customDark]) checkReferences(pairs, defined)
 checkComplete('semantic-dark', dark, light)
-checkComplete('semantic-sepia', sepia, light)
+checkComplete('semantic-custom-light', customLight, light)
+checkComplete('semantic-custom-dark', customDark, light)
 
 const declare = (pairs: [string, string][], indent: string) =>
   pairs.map(([name, value]) => `${indent}--${name}: ${value};`).join('\n')
@@ -80,9 +87,11 @@ const header = `/*
  */
 `
 
-// Tailwind ships its own palette and scales. Clearing them leaves the system's values as the
-// only ones a utility can name, so an off-system value has to be written out as an arbitrary
-// value where review can see it. Breakpoints stay: the system adopts Tailwind's.
+// Tailwind ships its own palette and scales. Clearing the ones the system defines leaves its
+// values as the only ones those utilities can name, so an off-system colour, size, space,
+// radius or shadow has to be written out as an arbitrary value where review can see it. (An
+// off-system name such as min-h-10 produces no CSS at all, silently.) Breakpoints, letter
+// spacing, container widths and easings stay: the system adopts Tailwind's.
 const resets = [
   '--color-*: initial;',
   '--font-*: initial;',
@@ -113,14 +122,19 @@ ${declare(dark, '    ')}
   color-scheme: light;
 }
 
-:root[data-theme='sepia'] {
-  color-scheme: light;
-${declare(sepia, '  ')}
-}
-
 :root[data-theme='dark'] {
   color-scheme: dark;
 ${declare(dark, '  ')}
+}
+
+:root[data-theme='custom'][data-scheme='light'] {
+  color-scheme: light;
+${declare(customLight, '  ')}
+}
+
+:root[data-theme='custom'][data-scheme='dark'] {
+  color-scheme: dark;
+${declare(customDark, '  ')}
 }
 `
 

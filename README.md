@@ -7,12 +7,14 @@ leave your device. There are no accounts, no servers and no tracking.
 Carrel renders books with [Readest's fork of foliate-js](https://github.com/readest/foliate-js)
 and PDF.js.
 
+- A library of covers or a list, searched and sorted, with books chosen and removed together
 - Paged or scrolling layout, one or two columns, page-turn animations, full screen
-- Light, sepia and dark themes that the book pages follow
+- Light and dark themes, and themes of your own colours, that the book pages follow
 - Type settings: typeface, size, line spacing, alignment, paragraph style, hyphenation,
   spacing, margins, line length and custom CSS, for all books or for one book
 - Your own fonts, from files or from a link (Google Fonts, jsDelivr, cdnjs and the like)
-- Search within a book, footnotes in a popup, table of contents, running heads
+- Search within a book, footnotes in a popup, a table of contents beside the page, running
+  heads, and the progress in the page's corner
 - Fit to page or width and facing pages for PDFs and comics
 - Backup and restore of the whole library, books included, as one zip file
 - Installable, and works offline once loaded
@@ -54,10 +56,15 @@ The build in `dist/` is a static site. It must be served from the root of its do
 foliate-js loads PDF.js's worker, fonts and character maps from `/vendor/pdfjs/`, so a copy
 served under a sub-path (such as `user.github.io/carrel/`) cannot open PDFs.
 
-Pushes to `master` are built and deployed to GitHub Pages by `.github/workflows/ci.yml`. In the
-repository settings, set Pages to deploy from GitHub Actions and set the custom domain.
+`.github/workflows/ci.yml` checks every push and pull request. Pushing a release tag, such as
+`0.1.0`, also builds the site and deploys it to GitHub Pages. In the repository settings, set
+Pages to deploy from GitHub Actions and set the custom domain, and under Environments, let the
+`github-pages` environment deploy from tags.
+
+Changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## License
 
 MIT. The production build includes `licenses.md`, which lists the licenses of the bundled
-dependencies; PDF.js's licenses are in `vendor/pdfjs/licenses/`.
+dependencies; PDF.js's licenses are in `vendor/pdfjs/licenses/`, and that of fflate, which
+foliate-js bundles, in `vendor/fflate/`.

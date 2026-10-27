@@ -14,6 +14,18 @@ test('an empty library explains itself and offers to add books', async ({ page }
   await expect(page.getByRole('searchbox')).toHaveCount(0)
 })
 
+test('names an icon button in a tip while the pointer rests on it, until it is pressed', async ({
+  page,
+}) => {
+  const tip = page.locator('[popover][aria-hidden]')
+  await page.getByRole('button', { name: 'Settings' }).hover()
+  await expect(tip).toBeVisible()
+  await expect(tip).toHaveText('Settings')
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible()
+  await expect(tip).toBeHidden()
+})
+
 test('adds a book with its title, author and cover', async ({ page }) => {
   await addBooks(page, fixtures.epub())
   await expect(page.getByRole('status')).toContainText('Added “The Test Book”.')
@@ -69,4 +81,9 @@ test('finds books by title or author', async ({ page }) => {
   await page.getByRole('searchbox', { name: 'Search your library' }).fill('nothing like this')
   await page.getByRole('button', { name: 'Clear search' }).click()
   await expect(page.getByRole('listitem')).toHaveCount(2)
+})
+
+test('names a book by its first page when nothing else names it', async ({ page }) => {
+  await addBooks(page, fixtures.anonymousPdf())
+  await expect(page.getByRole('status')).toContainText('Added “Page 1 of the portable document”.')
 })

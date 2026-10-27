@@ -6,6 +6,7 @@ import {
   type Inspection,
   importFiles,
   removeBook,
+  removeBooks,
   saveProgress,
 } from '@/domain/library'
 import { defaultReadingSettings } from '@/domain/settings'
@@ -42,6 +43,19 @@ describe('importFiles', () => {
     expect(stored?.file.name).toBe('book.epub')
     expect(await stored?.file.text()).toBe('alpha')
     expect(await db.covers.get(id)).toBeDefined()
+  })
+
+  it('keeps titles and authors within what a backup takes back', async () => {
+    const outcome = await importFiles([book('alpha')], {
+      inspect: async () => ({
+        ...inspection('A'.repeat(20_000)),
+        authors: Array.from({ length: 500 }, (_, n) => `Author ${n}`),
+      }),
+    })
+    const stored = await db.books.get(outcome.added[0]?.id ?? '')
+    expect(stored?.title.length).toBeLessThanOrEqual(1_001)
+    expect(stored?.title.endsWith('…')).toBe(true)
+    expect(stored?.authors).toHaveLength(100)
   })
 
   it('reports a file already in the library as a duplicate without inspecting it again', async () => {
@@ -106,5 +120,17 @@ describe('removeBook', () => {
     expect(await db.covers.get(id)).toBeUndefined()
     expect(await db.progress.get(id)).toBeUndefined()
     expect(await db.bookSettings.get(id)).toBeUndefined()
+  })
+})
+
+describe('removeBooks', () => {
+  it('deletes the books named and leaves the others', async () => {
+    const outcome = await importFiles([book('one'), book('two'), book('three')], {
+      inspect: async (file) => inspection(file.name),
+    })
+    const [one, two, three] = outcome.added.map((added) => added.id)
+    await removeBooks([one ?? '', three ?? ''])
+    expect((await db.books.toArray()).map((each) => each.id)).toEqual([two])
+    expect(await db.files.count()).toBe(1)
   })
 })

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import type { ImportFailure } from '@/domain/library'
 import { libraryHref } from '@/domain/routes'
 import { useImports } from '@/store/imports'
 
@@ -23,14 +24,20 @@ export function useLaunchFiles(): void {
     if (!queue) return
     queue.setConsumer(({ files }) => {
       if (files.length === 0) return
-      Promise.all(files.map((handle) => handle.getFile()))
-        .then((picked) => {
-          window.location.hash = libraryHref
-          add(picked)
+      window.location.hash = libraryHref
+      void Promise.allSettled(files.map((handle) => handle.getFile())).then((results) => {
+        const read: File[] = []
+        const unread: ImportFailure[] = []
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            read.push(result.value)
+          } else {
+            console.error('could not read a file opened with Carrel', result.reason)
+            unread.push({ fileName: files[index]?.name ?? '', reason: 'It couldn’t be read.' })
+          }
         })
-        .catch((error: unknown) =>
-          console.error('could not read the files opened with Carrel', error),
-        )
+        add(read, unread)
+      })
     })
   }, [add])
 }

@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { defaultReadingSettings, type ReadingSettings } from '@/domain/settings'
 import { applyAttributes, fixedLayoutAttributes, paginatorAttributes } from '@/ui/reader/layout'
-import { type PageTheme, pageStyles } from '@/ui/reader/pageStyles'
+import { type PageTheme, pageStyles, textShiftProperty } from '@/ui/reader/pageStyles'
 import { schemeOf } from '@/ui/useTheme'
 
 const light: PageTheme = {
   scheme: 'light',
-  background: '#fafaf6',
+  background: '#f7f9f9',
   foreground: '#332b29',
   link: '#26643f',
 }
-const dark: PageTheme = { ...light, scheme: 'dark', background: '#1d1716' }
+const dark: PageTheme = { ...light, scheme: 'dark', background: '#17171c' }
 
 const styles = (
   settings: Partial<ReadingSettings> = {},
@@ -49,7 +49,7 @@ describe('pageStyles', () => {
 
   it('paints the page in the theme’s colour, whatever the book gives its body', () => {
     const { after } = styles()
-    expect(after).toContain('--theme-bg-color: #fafaf6;')
+    expect(after).toContain('--theme-bg-color: #f7f9f9;')
     expect(after).toContain('--override-color: true;')
   })
 
@@ -61,6 +61,12 @@ describe('pageStyles', () => {
     expect(styles({ paragraphs: 'spaced' }).after).toContain('text-indent: 0 !important')
   })
 
+  it('moves the text across inside the scroller only in scrolled layout', () => {
+    // Moving the body in paged layout would slide the text across the page breaks.
+    expect(styles({ flow: 'scrolled' }).after).toContain(`translate: var(${textShiftProperty}`)
+    expect(styles({ flow: 'paginated' }).after).not.toContain('translate')
+  })
+
   it('puts the reader’s own CSS last, so it has the final word', () => {
     const { after } = styles({ customCss: 'p { color: hotpink; }', paragraphs: 'spaced' })
     expect(after.trimEnd().endsWith('p { color: hotpink; }')).toBe(true)
@@ -68,8 +74,12 @@ describe('pageStyles', () => {
 })
 
 describe('paginatorAttributes', () => {
+  // Paged layout unless a test says otherwise; the default is scrolled.
   const attributes = (settings: Partial<ReadingSettings> = {}, reducedMotion = false) =>
-    paginatorAttributes({ ...defaultReadingSettings, ...settings }, reducedMotion)
+    paginatorAttributes(
+      { ...defaultReadingSettings, flow: 'paginated', ...settings },
+      reducedMotion,
+    )
 
   it('lays the text out as the settings say', () => {
     expect(attributes({ maxColumnWidth: 720, sideMargin: 32, columns: 'one' })).toMatchObject({
@@ -97,7 +107,7 @@ describe('paginatorAttributes', () => {
   it('fits fixed-layout pages and spreads as the settings say', () => {
     expect(
       fixedLayoutAttributes({ ...defaultReadingSettings, pageFit: 'width', spreads: 'none' }),
-    ).toEqual({ flow: 'paginated', zoom: 'fit-width', spread: 'none' })
+    ).toEqual({ flow: 'scrolled', zoom: 'fit-width', spread: 'none' })
   })
 })
 
@@ -127,11 +137,10 @@ describe('applyAttributes', () => {
 })
 
 describe('schemeOf', () => {
-  it('follows the system only under the system theme; sepia is a light theme', () => {
+  it('follows the system only under the system theme', () => {
     expect(schemeOf('system', true)).toBe('dark')
     expect(schemeOf('system', false)).toBe('light')
     expect(schemeOf('light', true)).toBe('light')
-    expect(schemeOf('sepia', true)).toBe('light')
     expect(schemeOf('dark', false)).toBe('dark')
   })
 })

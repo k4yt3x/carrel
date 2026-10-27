@@ -8,7 +8,8 @@
  */
 
 import { db, type Font, type FontFile } from '@/domain/db'
-import { isQuotaError } from '@/domain/library'
+import { newId } from '@/domain/ids'
+import { isQuotaError, storageFullMessage } from '@/domain/library'
 
 type FontFormat = FontFile['format']
 
@@ -19,7 +20,7 @@ export class FontImportError extends Error {
 
 const MiB = 1024 * 1024
 /** Larger than any real font file, CJK fonts included. */
-const fontFileLimit = 32 * MiB
+export const fontFileLimit = 32 * MiB
 /** The @font-face rules of a CJK family split into hundreds of slices fit in a few hundred KB. */
 const stylesheetLimit = 2 * MiB
 const stylesheetFileLimit = 1000
@@ -32,6 +33,7 @@ const blockedMessage =
   'The site didn’t allow Carrel to download it. Use a link from Google Fonts, jsDelivr or cdnjs, ' +
   'or download the file and add it.'
 const notFontOrStylesheetMessage = 'The link doesn’t lead to a font file or a font stylesheet.'
+const offlineMessage = 'You’re offline. Connect to the internet and try again.'
 
 /** How a message refers to a file: by its name when it has one. */
 const subject = (file: Blob) => (file instanceof File && file.name ? `“${file.name}”` : 'It')
@@ -467,7 +469,7 @@ export function parseFontFaceCss(css: string, base: URL): FontFaceSource[] {
 export const fontCssFamily = (id: string): string => `carrel-font-${id}`
 
 /** A CSS string literal, with every character that could end the string or the rule escaped. */
-function cssString(text: string): string {
+export function cssString(text: string): string {
   let escaped = ''
   for (const char of text) {
     const code = char.codePointAt(0) ?? 0
@@ -496,8 +498,6 @@ export function fontFaceRules(font: Font, urlFor: (file: FontFile) => string): s
 }
 
 export interface AddFontOptions {
-  /** The name to show for the font, instead of the one the font gives itself. */
-  family?: string
   /** Throws FontImportError when the browser cannot use a file. Defaults to loading it. */
   validate?: (file: Blob) => Promise<void>
 }
@@ -515,13 +515,16 @@ async function loadsInBrowser(file: Blob): Promise<void> {
   }
 }
 
-/** Refuses a family name the library already has, ignoring case as CSS does. */
+/** The library's font with this family name, ignoring case as CSS does. */
+export const fontNamed = (family: string): Promise<Font | undefined> =>
+  db.fonts.where('family').equalsIgnoreCase(family).first()
+
+/** Refuses a family name the library already has. */
 async function assertFamilyFree(family: string): Promise<void> {
-  const existing = await db.fonts.where('family').equalsIgnoreCase(family).first()
+  const existing = await fontNamed(family)
   if (existing) {
     throw new FontImportError(
-      `A font named “${existing.family}” is already in your library. ` +
-        'Remove it first or give this one another name.',
+      `A font named “${existing.family}” is already in your library. Remove it to add this one.`,
     )
   }
 }
@@ -535,29 +538,39 @@ async function storeFonts(fonts: Font[]): Promise<void> {
     })
   } catch (error) {
     if (!isQuotaError(error)) throw error
-    throw new FontImportError('This browser has no storage space left for it.')
+    throw new FontImportError(storageFullMessage)
   }
 }
 
-const styleWord = [
-  'thin',
-  'hairline',
-  '(?:extra|ultra)-?light',
-  'light',
-  'regular',
-  'normal',
-  'book',
-  'medium',
-  '(?:semi|demi)-?bold',
-  '(?:extra|ultra)-?bold',
-  'bold',
-  'black',
-  'heavy',
-].join('|')
+/** The weights that style names in file names stand for, as CSS numbers them. */
+const styleWeights: [RegExp, string][] = [
+  [/^(?:thin|hairline)$/i, '100'],
+  [/^(?:extra|ultra)-?light$/i, '200'],
+  [/^light$/i, '300'],
+  [/^(?:regular|normal|book)$/i, '400'],
+  [/^medium$/i, '500'],
+  [/^(?:semi|demi)-?bold$/i, '600'],
+  [/^bold$/i, '700'],
+  [/^(?:extra|ultra)-?bold$/i, '800'],
+  [/^(?:black|heavy)$/i, '900'],
+]
+const styleWord = styleWeights.map(([word]) => word.source.slice(1, -1)).join('|')
 const styleSuffix = new RegExp(
-  `[-_ ]+(?:(?:${styleWord})(?:[-_ ]?(?:italic|oblique))?|italic|oblique)$`,
+  `[-_ ]+(?:(${styleWord})(?:[-_ ]?(italic|oblique))?|(italic|oblique))$`,
   'i',
 )
+
+/**
+ * The weight and slant a file name gives, as `Literata-SemiBoldItalic.woff2` does: for files
+ * whose own tables can't be read (WOFF2), so a family's files don't all come out regular.
+ */
+function styleFromFileName(name: string): { weight: string | null; italic: boolean } {
+  const match = styleSuffix.exec(name.replace(/\.[^.]*$/, ''))
+  if (!match) return { weight: null, italic: false }
+  const [, word, slant, slantAlone] = match
+  const weight = word ? (styleWeights.find(([pattern]) => pattern.test(word))?.[1] ?? null) : null
+  return { weight, italic: Boolean(slant || slantAlone) }
+}
 
 /** A family name from a file name such as `Literata-BoldItalic.ttf`, for fonts that give none. */
 function familyFromFileName(name: string): string {
@@ -572,29 +585,32 @@ function familyFromFileName(name: string): string {
 async function addFiles(
   files: readonly File[],
   source: string,
-  { family, validate = loadsInBrowser }: AddFontOptions,
+  { validate = loadsInBrowser }: AddFontOptions,
 ): Promise<Font> {
   const [first] = files
   if (!first) throw new FontImportError('No font files were chosen.')
   for (const file of files) if (file.size > fontFileLimit) throw tooLarge(file.name)
   const read: { file: File; metadata: FontMetadata }[] = []
   for (const file of files) read.push({ file, metadata: await readFontMetadata(file) })
-  const name =
-    normalizeSpace(family ?? '') || read[0]?.metadata.family || familyFromFileName(first.name)
+  const name = read[0]?.metadata.family || familyFromFileName(first.name)
   await assertFamilyFree(name)
   for (const file of files) await validate(file)
   const font: Font = {
-    id: crypto.randomUUID(),
+    id: newId(),
     family: name,
     source,
     addedAt: Date.now(),
-    files: read.map(({ file, metadata }) => ({
-      data: file,
-      format: metadata.format,
-      weight: metadata.weight ?? '400',
-      style: metadata.italic ? 'italic' : 'normal',
-      unicodeRange: null,
-    })),
+    files: read.map(({ file, metadata }) => {
+      // A WOFF2 file says nothing of itself that can be read here; its name says the rest.
+      const named = metadata.format === 'woff2' ? styleFromFileName(file.name) : null
+      return {
+        data: file,
+        format: metadata.format,
+        weight: metadata.weight ?? named?.weight ?? '400',
+        style: metadata.italic || named?.italic ? 'italic' : 'normal',
+        unicodeRange: null,
+      }
+    }),
   }
   await storeFonts([font])
   return font
@@ -682,6 +698,8 @@ async function download(
     // which it was.
     if (!(error instanceof TypeError)) throw error
     console.warn(`could not download ${url.href}`, error)
+    // Offline, every site fails the same way; that one the browser does say.
+    if (globalThis.navigator?.onLine === false) throw new FontImportError(offlineMessage)
     throw new FontImportError(blockedMessage)
   }
   if (!response.ok) {
@@ -761,7 +779,7 @@ async function addFromStylesheet(
   base: URL,
   isCss: boolean,
   fetchFont: typeof fetch,
-  { family, validate = loadsInBrowser, onProgress }: AddFontFromUrlOptions,
+  { validate = loadsInBrowser, onProgress }: AddFontFromUrlOptions,
 ): Promise<Font[]> {
   const sources = parseFontFaceCss(css, base)
   if (sources.length === 0) {
@@ -788,17 +806,13 @@ async function addFromStylesheet(
     entry.sources.push(source)
     families.set(key, entry)
   }
-  const override = families.size === 1 ? normalizeSpace(family ?? '') : ''
-  const groups = [...families.values()].map((group) => ({
-    ...group,
-    family: override || group.family,
-  }))
+  const groups = [...families.values()]
   for (const group of groups) await assertFamilyFree(group.family)
   const files = await downloadFontFiles(urls, fetchFont, validate, onProgress)
   const addedAt = Date.now()
   const fonts = groups.map(
     (group): Font => ({
-      id: crypto.randomUUID(),
+      id: newId(),
       family: group.family,
       source: location.href,
       addedAt,
@@ -816,7 +830,7 @@ async function addFromStylesheet(
 /**
  * Downloads fonts from a link to a font file or to a stylesheet of @font-face rules, such as
  * Google Fonts' embed link. A stylesheet adds one font per family it names, with every file
- * it lists. `options.family` names the font when the link yields exactly one. Throws
+ * it lists. Throws
  * FontImportError, with nothing stored, when the link or any file in it cannot be used.
  */
 export async function addFontFromUrl(

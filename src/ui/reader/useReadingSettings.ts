@@ -19,12 +19,12 @@ export interface ReadingSettingsControl {
 }
 
 /**
- * A book's reading settings: its own when it has them, otherwise the shared ones. `onError`
- * hears of a change that couldn't be saved, which therefore doesn't take effect.
+ * A book's reading settings: its own when it has them, otherwise the shared ones. `onSaved`
+ * hears whether a change was saved: one that wasn't doesn't take effect.
  */
 export function useReadingSettings(
   bookId: string,
-  onError: (error: unknown) => void,
+  onSaved: (error: unknown) => void,
 ): ReadingSettingsControl {
   const shared = useAppSettings((state) => state.reading)
   const setShared = useAppSettings((state) => state.setReading)
@@ -35,17 +35,20 @@ export function useReadingSettings(
   }, [bookId])
 
   const scope: SettingsScope = own ? 'book' : 'all'
+  const saved = (write: Promise<unknown>) => {
+    write.then(() => onSaved(null), onSaved)
+  }
   return {
     settings: own === undefined ? undefined : (own ?? shared),
     scope,
     update(settings) {
-      if (scope === 'book') db.bookSettings.put({ id: bookId, settings }).catch(onError)
+      if (scope === 'book') saved(db.bookSettings.put({ id: bookId, settings }))
       else setShared(settings)
     },
     setScope(next) {
       if (next === scope) return
-      if (next === 'book') db.bookSettings.put({ id: bookId, settings: shared }).catch(onError)
-      else db.bookSettings.delete(bookId).catch(onError)
+      if (next === 'book') saved(db.bookSettings.put({ id: bookId, settings: shared }))
+      else saved(db.bookSettings.delete(bookId))
     },
   }
 }

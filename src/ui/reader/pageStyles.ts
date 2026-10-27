@@ -37,13 +37,11 @@ export function currentPageTheme(scheme: 'light' | 'dark'): PageTheme {
   }
 }
 
-/** The font stacks behind the Serif and Sans typefaces, from the design tokens. */
-export function systemFontStacks(): { serif: string; sans: string } {
-  const style = getComputedStyle(document.documentElement)
-  return {
-    serif: style.getPropertyValue('--font-serif').trim() || 'serif',
-    sans: style.getPropertyValue('--font-sans').trim() || 'sans-serif',
-  }
+/** The font stack behind the Serif typeface, from the design tokens. */
+export function serifFontStack(): string {
+  return (
+    getComputedStyle(document.documentElement).getPropertyValue('--font-serif').trim() || 'serif'
+  )
 }
 
 // Body text: the elements whose spacing and alignment the settings take over. Headings,
@@ -51,7 +49,6 @@ export function systemFontStacks(): { serif: string; sans: string } {
 const prose = 'p, li, blockquote, dd, dt'
 
 const defaults = `
-@namespace epub "http://www.idpf.org/2007/ops";
 p, li, blockquote, dd {
   hanging-punctuation: allow-end last;
   widows: 2;
@@ -67,7 +64,7 @@ function colors({ scheme, background, foreground, link }: PageTheme, recolor: bo
   // --theme-bg-color; a background on <html> would cover the running heads and feet,
   // which sit in the margins behind the page document. The paginator otherwise paints the
   // colour a book gives its <body> (often white); --override-color makes it use the
-  // theme's, keeping any background image, so a sepia page stays sepia.
+  // theme's, keeping any background image, so a page keeps the theme's colour.
   const base = `
 html {
   color-scheme: ${scheme};
@@ -91,6 +88,9 @@ a:any-link, a:any-link * {
 }
 `
 }
+
+/** The custom property on a page's root that moves its text across, in scrolled layout. */
+export const textShiftProperty = '--carrel-text-shift'
 
 function typography(settings: ReadingSettings, fontFamily: string | null): string {
   const rules = [
@@ -125,6 +125,11 @@ function typography(settings: ReadingSettings, fontFamily: string | null): strin
   }
   if (settings.wordSpacing !== 0) {
     rules.push(`body { word-spacing: ${settings.wordSpacing}em !important; }`)
+  }
+  if (settings.flow === 'scrolled') {
+    // In scrolled layout the scroller spans the window, so its scrollbar stays at the edge; the
+    // reader moves the text across inside it by setting this variable on each page.
+    rules.push(`body { translate: var(${textShiftProperty}, 0px) 0 !important; }`)
   }
   return rules.join('\n')
 }

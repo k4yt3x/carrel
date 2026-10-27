@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto'
+import Dexie from 'dexie'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db, type Font } from '@/domain/db'
 import {
@@ -483,15 +484,21 @@ describe('addFontFiles', () => {
     expect(validate.mock.calls.map(([file]) => file)).toEqual([regular, boldItalic])
   })
 
-  it('names the font after its file when the font gives no name, or as the reader asks', async () => {
-    const unnamed = new File([woff2()], 'Source_Serif-SemiBoldItalic.woff2')
-    expect((await addFontFiles([unnamed], { validate: accept })).family).toBe('Source Serif')
-    const literata = ttf('Literata.ttf', { names: [windowsName(1, 'Literata')] })
-    const named = await addFontFiles([literata], {
-      family: '  Reading   Face ',
-      validate: accept,
-    })
-    expect(named.family).toBe('Reading Face')
+  it('names and places WOFF2 files by their file names, which is all they give', async () => {
+    const files = [
+      new File([woff2()], 'Source_Serif-Regular.woff2'),
+      new File([woff2()], 'Source_Serif-SemiBoldItalic.woff2'),
+      new File([woff2()], 'Source_Serif-Italic.woff2'),
+      new File([woff2()], 'Source_Serif.woff2'),
+    ]
+    const font = await addFontFiles(files, { validate: accept })
+    expect(font.family).toBe('Source Serif')
+    expect(font.files.map(({ weight, style }) => [weight, style])).toEqual([
+      ['400', 'normal'],
+      ['600', 'italic'],
+      ['400', 'italic'],
+      ['400', 'normal'],
+    ])
   })
 
   it('refuses a name already in the library, whatever its case, until that font is removed', async () => {
@@ -503,8 +510,6 @@ describe('addFontFiles', () => {
     expect((await refusal(addFontFiles([same], { validate }))).message).toMatch(
       /“Literata” is already in your library/,
     )
-    const other = ttf('c.ttf', { names: [windowsName(1, 'Other')] })
-    await refusal(addFontFiles([other], { family: ' literata ', validate }))
     expect(validate).not.toHaveBeenCalled()
     expect(await db.fonts.count()).toBe(1)
     await removeFont(first.id)
@@ -537,9 +542,12 @@ describe('addFontFiles', () => {
 
   it('says so when the browser has no storage space left', async () => {
     const full = new DOMException('The quota has been exceeded.', 'QuotaExceededError')
-    vi.spyOn(db.fonts, 'bulkAdd').mockRejectedValue(full)
-    const error = await refusal(addFontFiles([ttf('Good.ttf')], { validate: accept }))
-    expect(error.message).toMatch(/no storage space/)
+    // Refused as the write is made, or as the transaction commits, which aborts it.
+    for (const refused of [full, new Dexie.AbortError('Transaction aborted', full)]) {
+      vi.spyOn(db.fonts, 'bulkAdd').mockRejectedValueOnce(refused)
+      const error = await refusal(addFontFiles([ttf('Good.ttf')], { validate: accept }))
+      expect(error.message).toMatch(/run out of storage space/)
+    }
   })
 })
 
@@ -646,23 +654,6 @@ describe('addFontFromUrl', () => {
     expect(await db.fonts.count()).toBe(1)
   })
 
-  it('names a stylesheet’s font as asked only when the stylesheet has one family', async () => {
-    const one = 'https://fonts.example/one.css'
-    const two = 'https://fonts.example/two.css'
-    const fetch = stubFetch({
-      [one]: css('@font-face { font-family: Literata; src: url(a.woff2); }'),
-      [two]: css(
-        '@font-face { font-family: Alpha; src: url(a.woff2); } ' +
-          '@font-face { font-family: Beta; src: url(a.woff2); }',
-      ),
-      'https://fonts.example/a.woff2': file(woff2()),
-    })
-    const named = await addFontFromUrl(one, { fetch, validate: accept, family: 'Body' })
-    expect(named.map(({ family }) => family)).toEqual(['Body'])
-    const both = await addFontFromUrl(two, { fetch, validate: accept, family: 'Body Two' })
-    expect(both.map(({ family }) => family)).toEqual(['Alpha', 'Beta'])
-  })
-
   it('explains a download the site blocked or failed', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const blocked = vi.fn(async () => {
@@ -673,6 +664,10 @@ describe('addFontFromUrl', () => {
       /didn’t allow Carrel to download it/,
     )
     expect((await refusal(addFontFromUrl(url, { fetch: stubFetch({}) }))).message).toMatch(/404/)
+    // Offline, the failure is the connection's, not the site's.
+    vi.stubGlobal('navigator', { onLine: false })
+    expect((await refusal(addFontFromUrl(url, { fetch: blocked }))).message).toMatch(/offline/)
+    vi.unstubAllGlobals()
   })
 
   it('explains a link that leads to no font', async () => {

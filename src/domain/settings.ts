@@ -7,11 +7,21 @@
  * fills in fields added since the settings were saved and drops values it does not accept.
  */
 
-export const themes = ['system', 'light', 'sepia', 'dark'] as const
-export type Theme = (typeof themes)[number]
+import type { CustomThemeRef } from '@/domain/themes'
 
-/** The book's own fonts, the system's serif or sans-serif, or a font the reader added. */
-export type Typeface = 'book' | 'serif' | 'sans' | { fontId: string }
+export const builtinThemes = ['system', 'light', 'dark'] as const
+export type BuiltinTheme = (typeof builtinThemes)[number]
+/** A theme that comes with Carrel, or one the reader made (see themes.ts). */
+export type Theme = BuiltinTheme | CustomThemeRef
+
+/**
+ * The book's own fonts, the system's serif or sans-serif, a font the reader added (by its id),
+ * or a font installed on the device (by its family name).
+ */
+export type Typeface = 'book' | 'serif' | 'sans' | { fontId: string } | { family: string }
+
+/** Longest font family name kept; real ones are a few dozen characters. */
+export const familyNameLimit = 200
 
 export interface ReadingSettings {
   typeface: Typeface
@@ -38,8 +48,13 @@ export interface ReadingSettings {
   sideMargin: number
   pageTurn: 'slide' | 'curl' | 'none'
   tapToTurn: boolean
-  /** Book title, chapter and progress in the page margins. */
+  /** Book title and chapter in the page margins. */
   runningHeads: boolean
+  /**
+   * What the corner of the page says of the reader's progress: the percentage, the page (of a
+   * fixed layout, or of the text in fixed lengths), or nothing.
+   */
+  progress: 'percent' | 'page' | 'none'
   /** How fixed-layout books (PDF, comics) fit the window. */
   pageFit: 'page' | 'width'
   /** Whether fixed-layout books show facing pages side by side. */
@@ -58,29 +73,57 @@ export const defaultReadingSettings: ReadingSettings = {
   letterSpacing: 0,
   wordSpacing: 0,
   keepBookColors: true,
-  flow: 'paginated',
+  flow: 'scrolled',
   columns: 'auto',
   maxColumnWidth: 640,
   sideMargin: 16,
   pageTurn: 'slide',
   tapToTurn: true,
   runningHeads: true,
+  progress: 'percent',
   pageFit: 'page',
   spreads: 'auto',
   customCss: '',
 }
 
-/** The range and step of each numeric setting; the controls and the normalizer share them. */
+/**
+ * The range of each numeric setting, which the normalizer enforces, and the step its slider
+ * moves in. Typed values may fall between steps.
+ */
 export const limits = {
   fontSize: { min: 12, max: 36, step: 1 },
-  lineHeight: { min: 1, max: 2.4, step: 0.1 },
+  lineHeight: { min: 1, max: 2.4, step: 0.05 },
   letterSpacing: { min: -0.05, max: 0.2, step: 0.01 },
-  wordSpacing: { min: 0, max: 0.5, step: 0.05 },
-  maxColumnWidth: { min: 400, max: 1200, step: 40 },
-  sideMargin: { min: 0, max: 96, step: 8 },
+  wordSpacing: { min: 0, max: 0.5, step: 0.01 },
+  maxColumnWidth: { min: 400, max: 1200, step: 10 },
+  sideMargin: { min: 0, max: 96, step: 2 },
 } as const satisfies Partial<
   Record<keyof ReadingSettings, { min: number; max: number; step: number }>
 >
+
+/**
+ * How far the text may be moved from the window's centre, in pixels either way. Past any screen
+ * in use; the reader keeps the text inside the window whatever is stored.
+ */
+export const textOffsetLimit = 4000
+
+/**
+ * The reader's offset of the text from the window's centre: pixels to the right, negative to the
+ * left. For browsers whose window isn't centred on the screen, such as one with vertical tabs.
+ */
+export function normalizeTextOffset(raw: unknown): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return 0
+  // `+ 0` turns a rounded -0 into 0.
+  return Math.round(Math.max(-textOffsetLimit, Math.min(textOffsetLimit, raw))) + 0
+}
+
+/** The docked contents' width, in pixels: wide enough for a chapter title, never most of the page. */
+export const tocWidthLimits = { min: 240, max: 560, default: 320 } as const
+
+export function normalizeTocWidth(raw: unknown): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return tocWidthLimits.default
+  return Math.round(Math.max(tocWidthLimits.min, Math.min(tocWidthLimits.max, raw)))
+}
 
 /** Longest custom stylesheet kept; anything longer is a paste accident, not a stylesheet. */
 export const customCssLimit = 100_000
@@ -101,6 +144,10 @@ function typeface(value: unknown): Typeface {
   if (value === 'book' || value === 'serif' || value === 'sans') return value
   if (isRecord(value) && typeof value.fontId === 'string' && value.fontId) {
     return { fontId: value.fontId }
+  }
+  if (isRecord(value) && typeof value.family === 'string') {
+    const family = value.family.trim()
+    if (family && family.length <= familyNameLimit) return { family }
   }
   return defaultReadingSettings.typeface
 }
@@ -127,6 +174,12 @@ export function normalizeReadingSettings(raw: unknown): ReadingSettings {
     pageTurn: oneOf(['slide', 'curl', 'none'], value.pageTurn, d.pageTurn),
     tapToTurn: bool('tapToTurn', d.tapToTurn),
     runningHeads: bool('runningHeads', d.runningHeads),
+    // Stored settings with no choice for the progress hid it along with the running heads.
+    progress: oneOf(
+      ['percent', 'page', 'none'],
+      value.progress,
+      value.progress === undefined && value.runningHeads === false ? 'none' : d.progress,
+    ),
     pageFit: oneOf(['page', 'width'], value.pageFit, d.pageFit),
     spreads: oneOf(['auto', 'none'], value.spreads, d.spreads),
     customCss:
@@ -134,4 +187,5 @@ export function normalizeReadingSettings(raw: unknown): ReadingSettings {
   }
 }
 
-export const isTheme = (value: unknown): value is Theme => themes.includes(value as Theme)
+export const isBuiltinTheme = (value: unknown): value is BuiltinTheme =>
+  builtinThemes.includes(value as BuiltinTheme)

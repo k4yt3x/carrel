@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [master]
+    tags: ["*"]
   pull_request:
 
 permissions:
@@ -23,11 +24,10 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm exec playwright install --with-deps chromium
-      # Builds the app and runs the browser tests against the production build.
       - run: pnpm test:e2e
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     needs: check
     runs-on: ubuntu-latest
     permissions:

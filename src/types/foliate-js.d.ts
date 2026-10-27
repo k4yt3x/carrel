@@ -3,9 +3,13 @@
  * plain JavaScript; these are written from its source at the pinned commit.
  */
 declare module 'foliate-js/view.js' {
+  /**
+   * An entry of a table of contents. A heading that links nowhere has no href (EPUB's <span>
+   * entries, a PDF outline item without a destination), and an entry can have no label.
+   */
   export interface TocItem {
-    label: string
-    href: string
+    label?: string | null
+    href?: string | null
     subitems?: TocItem[] | null
   }
 
@@ -48,6 +52,8 @@ declare module 'foliate-js/view.js' {
     tocItem?: TocItem | null
     pageItem?: { label: string } | null
     cfi: string
+    /** The text on show, in the section's document. */
+    range?: Range | null
   }
 
   export interface LoadDetail {
@@ -62,7 +68,6 @@ declare module 'foliate-js/view.js' {
 
   export interface Renderer extends HTMLElement {
     heads?: HTMLElement[] | null
-    feet?: HTMLElement[] | null
     /** One string goes after the book's own styles; a pair goes before and after them. */
     setStyles?(css: string | [before: string, after: string]): void
     /** The documents on screen; fixed-layout renderers have none to give. */
@@ -116,10 +121,15 @@ declare module 'foliate-js/view.js' {
     init(options: { lastLocation?: string | null; showTextStart?: boolean }): Promise<void>
     goTo(target: string | number): Promise<unknown>
     goToFraction(fraction: number): Promise<void>
-    prev(): Promise<void>
-    next(): Promise<void>
+    /** Where a CFI, href or section index leads; undefined when it leads nowhere in the book. */
+    resolveNavigation(target: string | number): unknown
+    /** In scrolled layout, `distance` scrolls by that many pixels instead of a screenful. */
+    prev(distance?: number): Promise<void>
+    next(distance?: number): Promise<void>
     goLeft(): Promise<void>
     goRight(): Promise<void>
+    /** Scrolls the page by so many pixels, as a drag would. */
+    pan(dx: number, dy: number): Promise<void>
     /** Searches the text and highlights what it finds, until `clearSearch`. */
     search(options: SearchOptions): AsyncGenerator<SearchEvent>
     clearSearch(): void

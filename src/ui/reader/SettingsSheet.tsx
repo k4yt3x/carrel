@@ -15,17 +15,13 @@
 
 import { ChevronRight, RotateCcw } from 'lucide-react'
 import type { Font } from '@/domain/db'
-import {
-  defaultReadingSettings,
-  limits,
-  type ReadingSettings,
-  type Theme,
-  type Typeface,
-} from '@/domain/settings'
+import { defaultReadingSettings, limits, type ReadingSettings, type Theme } from '@/domain/settings'
 import { Section, Segmented, Slider, Switch } from '@/ui/controls'
+import { TypefacePicker } from '@/ui/reader/TypefacePicker'
 import type { SettingsScope } from '@/ui/reader/useReadingSettings'
 import { Sheet } from '@/ui/Sheet'
 import { ThemePicker } from '@/ui/ThemePicker'
+import { useDraft } from '@/ui/useDraft'
 
 interface SettingsSheetProps {
   open: boolean
@@ -40,17 +36,45 @@ interface SettingsSheetProps {
   fixedLayout: boolean
   fonts: Pick<Font, 'id' | 'family'>[]
   onManageFonts(): void
+  /** Where the text sits across the window; absent where it can't be moved. */
+  textOffset?: {
+    /** Pixels right of the window's centre, negative to the left, as far as the window allows. */
+    value: number
+    /** The offsets that put the text against either edge; null when it fills the window. */
+    range: { min: number; max: number } | null
+    onChange(offset: number): void
+    /** Told while the slider is held, to mark the middle of the text. */
+    onHoldChange(holding: boolean): void
+  }
 }
 
-const typefaceValue = (typeface: Typeface) =>
-  typeof typeface === 'string' ? typeface : `font:${typeface.fontId}`
+// What the sliders say to a screen reader.
+const pixels = (value: number) => `${Math.round(value)} pixels`
+const offset = (value: number) =>
+  value === 0 ? 'Centred' : `${Math.abs(value)} pixels ${value < 0 ? 'left' : 'right'}`
+const em = (value: number) =>
+  value === 0 ? 'Normal' : `${value > 0 ? 'plus' : 'minus'} ${Math.abs(value).toFixed(2)} em`
 
-const parseTypeface = (value: string): Typeface =>
-  value.startsWith('font:') ? { fontId: value.slice('font:'.length) } : (value as Typeface)
-
-const px = (value: number) => `${value}px`
-const decimal = (digits: number) => (value: number) => value.toFixed(digits)
-const em = (value: number) => (value === 0 ? 'Normal' : `${value > 0 ? '+' : ''}${value}em`)
+/**
+ * The reader's own stylesheet. Typing restyles the book once the typing pauses, rather than on
+ * every keystroke, each of which would lay the book out again.
+ */
+function CustomCss({ value, onChange }: { value: string; onChange(css: string): void }) {
+  const draft = useDraft(value, onChange, 600)
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm text-fg-secondary">Custom CSS</span>
+      <textarea
+        className="textarea h-32 w-full font-mono text-xs"
+        spellCheck={false}
+        placeholder="p { text-indent: 2em; }"
+        value={draft.value}
+        onChange={(event) => draft.change(event.target.value)}
+        onBlur={draft.commit}
+      />
+    </label>
+  )
+}
 
 export function SettingsSheet({
   open,
@@ -64,16 +88,11 @@ export function SettingsSheet({
   fixedLayout,
   fonts,
   onManageFonts,
+  textOffset,
 }: SettingsSheetProps) {
   const set = <K extends keyof ReadingSettings>(key: K, value: ReadingSettings[K]) =>
     onChange({ ...settings, [key]: value })
   const paginated = settings.flow === 'paginated'
-  // A typeface whose font was removed falls back to the book's; the select shows that.
-  const typeface =
-    typeof settings.typeface === 'object' &&
-    !fonts.some((font) => font.id === (settings.typeface as { fontId: string }).fontId)
-      ? 'book'
-      : typefaceValue(settings.typeface)
 
   return (
     <Sheet open={open} title="Reading settings" side="end" seeThrough onClose={onClose}>
@@ -86,12 +105,8 @@ export function SettingsSheet({
             { value: 'book', label: 'This book' },
           ]}
           onChange={onScopeChange}
+          info="“This book” gives this book settings of its own; the others keep the shared ones."
         />
-        <p className="mt-2 text-xs leading-normal text-fg-muted">
-          {scope === 'all'
-            ? 'Books without settings of their own follow these.'
-            : 'This book keeps its own settings. Switch back to use the shared ones again.'}
-        </p>
       </div>
 
       <Section title="Theme">
@@ -100,45 +115,28 @@ export function SettingsSheet({
 
       {!fixedLayout && (
         <Section title="Text">
-          <div className="flex items-end gap-2">
-            <label className="block min-w-0 flex-1">
-              <span className="mb-2 block text-sm text-fg-secondary">Typeface</span>
-              <select
-                className="select w-full"
-                value={typeface}
-                onChange={(event) => set('typeface', parseTypeface(event.target.value))}
-              >
-                <option value="book">Book’s own</option>
-                <option value="serif">Serif</option>
-                <option value="sans">Sans-serif</option>
-                {fonts.length > 0 && (
-                  <optgroup label="Your fonts">
-                    {fonts.map((font) => (
-                      <option key={font.id} value={`font:${font.id}`}>
-                        {font.family}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </label>
-            <button type="button" className="btn btn-ghost" onClick={onManageFonts}>
-              {fonts.length > 0 ? 'Fonts…' : 'Add font…'}
-            </button>
-          </div>
+          <TypefacePicker
+            value={settings.typeface}
+            fonts={fonts}
+            onChange={(value) => set('typeface', value)}
+            onManageFonts={onManageFonts}
+          />
           <Slider
             label="Size"
             {...limits.fontSize}
             value={settings.fontSize}
-            format={px}
+            unit="px"
+            digits={0}
+            format={pixels}
             onChange={(value) => set('fontSize', value)}
           />
           <Slider
             label="Line spacing"
             {...limits.lineHeight}
             value={settings.lineHeight}
-            format={decimal(1)}
-            onChange={(value) => set('lineHeight', Math.round(value * 10) / 10)}
+            digits={2}
+            format={(value) => `${value.toFixed(2)} times the text size`}
+            onChange={(value) => set('lineHeight', Math.round(value * 100) / 100)}
           />
           <Segmented
             legend="Alignment"
@@ -162,7 +160,6 @@ export function SettingsSheet({
           />
           <Switch
             label="Hyphenation"
-            description="Breaks long words at line ends, for an even right edge."
             checked={settings.hyphenate}
             onChange={(value) => set('hyphenate', value)}
           />
@@ -217,14 +214,18 @@ export function SettingsSheet({
               label="Line length"
               {...limits.maxColumnWidth}
               value={settings.maxColumnWidth}
-              format={px}
+              unit="px"
+              digits={0}
+              format={pixels}
               onChange={(value) => set('maxColumnWidth', value)}
             />
             <Slider
               label="Side margins"
               {...limits.sideMargin}
               value={settings.sideMargin}
-              format={px}
+              unit="px"
+              digits={0}
+              format={pixels}
               onChange={(value) => set('sideMargin', value)}
             />
             {paginated && (
@@ -241,7 +242,7 @@ export function SettingsSheet({
                 />
                 <Switch
                   label="Running heads"
-                  description="The book and chapter titles above the text, your progress below."
+                  info="The book and chapter titles above the text."
                   checked={settings.runningHeads}
                   onChange={(value) => set('runningHeads', value)}
                 />
@@ -249,9 +250,41 @@ export function SettingsSheet({
             )}
           </>
         )}
+        <Segmented
+          legend="Progress"
+          value={settings.progress}
+          options={[
+            { value: 'percent', label: 'Percent' },
+            { value: 'page', label: 'Page' },
+            { value: 'none', label: 'None' },
+          ]}
+          onChange={(value) => set('progress', value)}
+          info={
+            fixedLayout
+              ? 'Shown in the corner of the page.'
+              : 'Shown in the corner of the page. Pages here are fixed lengths of text, so their numbers stay the same at any text size.'
+          }
+        />
+        {textOffset && (
+          <Slider
+            label="Position"
+            info="Moves the text left or right of the window’s centre, for a window that isn’t centred on the screen, such as a browser with vertical tabs."
+            min={textOffset.range?.min ?? 0}
+            max={textOffset.range?.max ?? 0}
+            step={1}
+            detent={0}
+            live
+            disabled={!textOffset.range}
+            value={textOffset.value}
+            unit="px"
+            digits={0}
+            format={offset}
+            onHoldChange={textOffset.onHoldChange}
+            onChange={textOffset.onChange}
+          />
+        )}
         <Switch
           label="Tap the sides to turn pages"
-          description="Otherwise any tap shows or hides the controls."
           checked={settings.tapToTurn}
           onChange={(value) => set('tapToTurn', value)}
         />
@@ -271,6 +304,8 @@ export function SettingsSheet({
               label="Letter spacing"
               {...limits.letterSpacing}
               value={settings.letterSpacing}
+              unit="em"
+              digits={2}
               format={em}
               onChange={(value) => set('letterSpacing', Math.round(value * 100) / 100)}
             />
@@ -278,28 +313,18 @@ export function SettingsSheet({
               label="Word spacing"
               {...limits.wordSpacing}
               value={settings.wordSpacing}
+              unit="em"
+              digits={2}
               format={em}
               onChange={(value) => set('wordSpacing', Math.round(value * 100) / 100)}
             />
             <Switch
               label="Keep the book’s colours"
-              description="In light themes, show text and backgrounds coloured as the book sets them. Dark themes always use their own."
+              info="Text and background colours the book sets are kept in light themes. Dark themes always use their own."
               checked={settings.keepBookColors}
               onChange={(value) => set('keepBookColors', value)}
             />
-            <label className="block">
-              <span className="mb-2 block text-sm text-fg-secondary">Custom CSS</span>
-              <textarea
-                className="textarea h-32 w-full font-mono text-xs"
-                spellCheck={false}
-                placeholder="p { text-indent: 2em; }"
-                value={settings.customCss}
-                onChange={(event) => set('customCss', event.target.value)}
-              />
-              <span className="mt-1 block text-xs leading-normal text-fg-muted">
-                Added to every page, after the book’s styles and these settings.
-              </span>
-            </label>
+            <CustomCss value={settings.customCss} onChange={(css) => set('customCss', css)} />
           </div>
         </details>
       )}

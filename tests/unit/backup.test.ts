@@ -35,14 +35,14 @@ const literata: Font = {
   addedAt: 3_000,
   files: [
     {
-      data: new Blob(['regular'], { type: 'font/woff2' }),
+      data: new Blob(['wOF2 regular'], { type: 'font/woff2' }),
       format: 'woff2',
       weight: '200 900',
       style: 'normal',
       unicodeRange: null,
     },
     {
-      data: new Blob(['italic'], { type: 'font/woff2' }),
+      data: new Blob(['wOF2 italic'], { type: 'font/woff2' }),
       format: 'woff2',
       weight: '200 900',
       style: 'italic',
@@ -144,7 +144,7 @@ describe('exportLibrary and restoreBackup', () => {
     })
     await db.fonts.add(literata)
     const before = await snapshot()
-    const preferences = { theme: 'sepia', reading: { fontSize: 20 }, list: [1, 'two', null, {}] }
+    const preferences = { theme: 'dark', reading: { fontSize: 20 }, list: [1, 'two', null, {}] }
 
     const exported: number[][] = []
     const backup = await exportLibrary(null, {
@@ -283,6 +283,21 @@ describe('exportLibrary and restoreBackup', () => {
     await db.fonts.add({ ...literata, family: 'Another Face' })
     expect((await restoreBackup(backup)).addedFonts).toBe(0)
     expect(await db.fonts.count()).toBe(1)
+  })
+
+  it('point settings that name a font at the library’s font of the same name', async () => {
+    const alpha = 'a'.repeat(64)
+    const byFont = { ...defaultReadingSettings, typeface: { fontId: literata.id } }
+    await db.fonts.add(literata)
+    await db.bookSettings.add({ id: alpha, settings: byFont })
+    const backup = await backUp(true, { theme: 'light', reading: byFont })
+
+    await clearLibrary()
+    await db.fonts.add({ ...literata, id: 'font-2' })
+    const outcome = await restoreBackup(backup)
+    const named = { fontId: 'font-2' }
+    expect(outcome.preferences).toMatchObject({ theme: 'light', reading: { typeface: named } })
+    expect((await db.bookSettings.get(alpha))?.settings.typeface).toEqual(named)
   })
 
   it('leave out records that are not valid, and normalize book settings', async () => {

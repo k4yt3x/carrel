@@ -10,8 +10,8 @@ type Attributes = Record<string, string | null>
 /** Attributes for reflowable books (EPUB, MOBI, FB2...), laid out by the paginator. */
 export function paginatorAttributes(settings: ReadingSettings, reducedMotion: boolean): Attributes {
   const scrolled = settings.flow === 'scrolled'
-  // The top and bottom margins hold the running heads and feet, which only paginated
-  // layout draws.
+  // The top margin holds the running head, which only paged layout draws; the bottom one
+  // matches it.
   const blockMargin = !scrolled && settings.runningHeads ? '48px' : '24px'
   return {
     flow: settings.flow,

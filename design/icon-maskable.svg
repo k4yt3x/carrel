@@ -1,7 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <title>Carrel</title>
-  <!-- Full-bleed for maskable use: the platform crops it to its own shape, and the open book
-       sits inside the central safe zone (a circle of 80% of the width). -->
-  <rect width="32" height="32" fill="#26643f"/>
-  <path d="M8 9.5c2.8-.9 5.5-.6 8 1.2v13c-2.5-1.8-5.2-2.1-8-1.2zM24 9.5c-2.8-.9-5.5-.6-8 1.2v13c2.5-1.8 5.2-2.1 8-1.2z" fill="#fafaf6"/>
+  <!-- public/favicon.svg, full-bleed for platforms that crop icons to their own shape: the
+       C and the book are drawn at 80% so they stay inside the central safe zone (a circle of
+       80% of the width). -->
+  <rect width="32" height="32" fill="#2b2b31"/>
+  <g transform="translate(3.2 3.2) scale(0.8)">
+    <path d="M24.5 6.3H10.8A4.5 4.5 0 0 0 6.3 10.8V21.2A4.5 4.5 0 0 0 10.8 25.7H24.5" fill="none" stroke="#f7f9f9" stroke-width="2.6" stroke-linecap="round"/>
+    <g fill="#f7f9f9">
+      <path d="M16.6 12.6C15.12 11.82 13.3 11.22 10.7 11.3V19.9C13.3 19.82 15.12 20.42 16.6 21.2Z"/>
+      <path d="M17.8 12.6C19.27 11.82 21.1 11.22 23.7 11.3V19.9C21.1 19.82 19.27 20.42 17.8 21.2Z"/>
+    </g>
+  </g>
 </svg>

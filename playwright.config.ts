@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const port = 4173
+// Not vite preview's default (4173): a preview of an older build left running there would be
+// tested in place of this one.
+const port = 4317
 
 export default defineConfig({
   testDir: 'tests/e2e',

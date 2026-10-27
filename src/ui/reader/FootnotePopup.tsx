@@ -1,6 +1,8 @@
 import type { View } from 'foliate-js/view.js'
 import { X } from 'lucide-react'
 import { type RefObject, useEffect, useRef } from 'react'
+import { openExternal } from '@/ui/reader/navigation'
+import { useBackdropDismiss } from '@/ui/useModalDialog'
 
 export interface Note {
   /** A view of its own, showing just the note. */
@@ -41,6 +43,7 @@ interface FootnotePopupProps extends NotePopupRefs {
  * that.
  */
 export function FootnotePopup({ note, onClose, onFollow, dialog, frame }: FootnotePopupProps) {
+  const backdrop = useBackdropDismiss(onClose)
   const latest = useRef({ onClose, onFollow })
   latest.current = { onClose, onFollow }
   const view = note?.view
@@ -66,7 +69,14 @@ export function FootnotePopup({ note, onClose, onFollow, dialog, frame }: Footno
       },
       { signal },
     )
-    view.addEventListener('external-link', (event) => event.preventDefault(), { signal })
+    view.addEventListener(
+      'external-link',
+      (event) => {
+        event.preventDefault()
+        openExternal(event.detail.href)
+      },
+      { signal },
+    )
     return () => listening.abort()
   }, [view])
 
@@ -103,15 +113,12 @@ export function FootnotePopup({ note, onClose, onFollow, dialog, frame }: Footno
   }, [note, dialog])
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: Escape is the keyboard way out of a modal dialog, and the browser handles it
     <dialog
       ref={dialog}
       aria-label="Note"
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
-      }}
-      className="fixed inset-x-4 top-auto bottom-6 m-0 mx-auto w-auto max-w-xl rounded-lg bg-surface-raised p-0 text-fg shadow-xl ring-1 ring-border backdrop:bg-transparent sm:inset-x-0"
+      {...backdrop}
+      className="fixed inset-x-4 top-auto bottom-[calc(24px+env(safe-area-inset-bottom))] m-0 mx-auto w-auto max-w-xl rounded-lg bg-surface-raised p-0 text-fg shadow-xl ring-1 ring-border backdrop:bg-transparent sm:inset-x-0"
     >
       <div ref={frame} className="h-16 p-4" />
       <div className="flex items-center justify-between border-t border-border ps-2 pe-1">
@@ -127,6 +134,7 @@ export function FootnotePopup({ note, onClose, onFollow, dialog, frame }: Footno
           type="button"
           className="btn btn-ghost btn-square btn-sm"
           aria-label="Close note"
+          data-tooltip="Close"
           onClick={onClose}
         >
           <X aria-hidden className="size-4" />

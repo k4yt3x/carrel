@@ -78,6 +78,15 @@
   }
 
   /*
+   * In scrolled layout the scroller spans the whole reading area, not just the text column
+   * (the column keeps its width inside it): its scrollbar sits at the window's edge, and the
+   * wheel scrolls the book wherever the pointer is. The reader marks the layout on the view.
+   */
+  foliate-view[data-flow="scrolled"]::part(container) {
+    grid-column: 1 / -1;
+  }
+
+  /*
    * Running heads and feet, which foliate-js lays out in the page margins. The paginator
    * paints the page background on a positioned layer that would otherwise cover them.
    */

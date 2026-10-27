@@ -77,12 +77,13 @@ export function ImportNotice() {
             className={`size-4 shrink-0 ${hasFailures ? 'text-danger-fg' : 'text-action-fg'}`}
           />
         </span>
-        <div className="min-w-0 flex-1 text-sm">
+        <div className="min-w-0 flex-1 text-sm break-words">
           <p className="font-semibold text-fg">{headline}</p>
           {hasFailures && (
             <ul className="mt-2 space-y-1 text-fg-secondary">
-              {failed.slice(0, shownFailures).map((failure) => (
-                <li key={failure.fileName} className="break-words">
+              {failed.slice(0, shownFailures).map((failure, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: two files can share a name, and the list never changes order
+                <li key={`${index}-${failure.fileName}`}>
                   {failed.length > 1 && <span className="text-fg">{failure.fileName}: </span>}
                   {failure.reason}
                 </li>
@@ -104,6 +105,7 @@ export function ImportNotice() {
           type="button"
           className="btn btn-ghost btn-sm btn-square -my-2 -me-2 text-fg-muted"
           aria-label="Dismiss"
+          data-tooltip=""
           onClick={dismiss}
         >
           <X aria-hidden className="size-4" />
@@ -112,9 +114,5 @@ export function ImportNotice() {
     )
   }
 
-  return (
-    <div className="fixed inset-x-4 bottom-4 z-60 sm:start-auto sm:end-8 sm:bottom-8 sm:w-96">
-      <div className="rounded-lg bg-surface-raised p-4 shadow-xl">{body}</div>
-    </div>
-  )
+  return <div className="rounded-lg bg-surface-raised p-4 shadow-xl">{body}</div>
 }

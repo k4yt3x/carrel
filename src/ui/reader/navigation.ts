@@ -5,7 +5,11 @@
  * the reader attaches these handlers to every page document as well as to the app.
  */
 
-export type Turn = 'prev' | 'next' | 'left' | 'right'
+/**
+ * 'up' and 'down' are the arrow keys: a page in paged layout, a few lines in scrolled layout,
+ * as arrow keys scroll anywhere else.
+ */
+export type Turn = 'prev' | 'next' | 'left' | 'right' | 'up' | 'down'
 
 export interface Navigator {
   turn(direction: Turn): void
@@ -31,8 +35,8 @@ const interactive = 'a[href], button, input, select, textarea, label, audio, vid
 const keyTurns: Record<string, Turn> = {
   ArrowLeft: 'left',
   ArrowRight: 'right',
-  ArrowUp: 'prev',
-  ArrowDown: 'next',
+  ArrowUp: 'up',
+  ArrowDown: 'down',
   PageUp: 'prev',
   PageDown: 'next',
 }
@@ -60,6 +64,10 @@ export function handleKey(event: KeyboardEvent, navigator: Navigator): void {
   }
   if (event.ctrlKey || event.metaKey || event.altKey) return
   if (navigator.isBusy() || editable(event.target)) return
+  // Space presses a focused button, such as a chapter in the contents, rather than turning.
+  if (event.key === ' ' && event.target instanceof Element && event.target.closest(interactive)) {
+    return
+  }
   let turn = keyTurns[event.key]
   if (event.key === ' ') turn = event.shiftKey ? 'prev' : 'next'
   if (turn) {
@@ -114,12 +122,24 @@ export function handleTap(event: MouseEvent, x: number, navigator: Navigator): v
   else navigator.toggleChrome()
 }
 
-/** Where a click inside a page document falls in the app's viewport. */
-export function viewportX(event: MouseEvent, doc: Document): number {
+/** Where a pointer event inside a page document falls in the app's viewport. */
+export function viewportPoint(event: MouseEvent, doc: Document): { x: number; y: number } {
   const frame = doc.defaultView?.frameElement
-  if (!(frame instanceof HTMLElement)) return event.clientX
+  if (!(frame instanceof HTMLElement)) return { x: event.clientX, y: event.clientY }
   const rect = frame.getBoundingClientRect()
   // Fixed-layout pages are scaled with a transform; the event's coordinates are not.
   const scale = frame.offsetWidth ? rect.width / frame.offsetWidth : 1
-  return rect.left + event.clientX * scale
+  return { x: rect.left + event.clientX * scale, y: rect.top + event.clientY * scale }
+}
+
+/** Opens a link from a book in a new tab, if it is a kind of link worth following. */
+export function openExternal(href: string): void {
+  let url: URL
+  try {
+    url = new URL(href)
+  } catch {
+    return
+  }
+  if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) return
+  window.open(url, '_blank', 'noopener,noreferrer')
 }

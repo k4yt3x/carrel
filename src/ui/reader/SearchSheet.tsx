@@ -37,8 +37,10 @@ type Status =
 const count = new Intl.NumberFormat()
 const percent = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 0 })
 
-// One Latin letter matches nearly every line; one CJK character is a word.
-const searchable = (query: string) => query.length >= 2 || /[^\p{Script=Latin}\p{N}\s]/u.test(query)
+// A single letter or mark matches nearly every line; a single CJK character is a word.
+const searchable = (query: string) =>
+  query.length >= 2 ||
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(query)
 
 export function SearchSheet({ open, onClose, search, clear, onSelect }: SearchSheetProps) {
   const [query, setQuery] = useState('')
@@ -47,18 +49,25 @@ export function SearchSheet({ open, onClose, search, clear, onSelect }: SearchSh
   const input = useRef<HTMLInputElement>(null)
   const latest = useRef({ search, clear })
   latest.current = { search, clear }
+  // The search running now, abandoned or not. An abandoned one stops at its next result, and
+  // may outline that result in the book first, so the next search waits for it to stop.
+  const running = useRef(Promise.resolve())
 
   // A search starts once typing pauses; a newer query abandons the one in progress.
   useEffect(() => {
     const text = query.trim()
     if (!searchable(text)) {
-      latest.current.clear()
+      running.current = running.current.then(() => latest.current.clear())
       setGroups([])
       setStatus({ name: 'idle' })
       return
     }
     let abandoned = false
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
+      running.current = running.current.then(() => run())
+    }, 400)
+    const run = async () => {
+      if (abandoned) return
       setGroups([])
       setStatus({ name: 'searching', progress: 0 })
       try {
@@ -78,7 +87,7 @@ export function SearchSheet({ open, onClose, search, clear, onSelect }: SearchSh
         console.error('search failed', error)
         if (!abandoned) setStatus({ name: 'failed' })
       }
-    }, 400)
+    }
     return () => {
       abandoned = true
       clearTimeout(timer)

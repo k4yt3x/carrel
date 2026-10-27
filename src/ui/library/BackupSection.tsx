@@ -14,7 +14,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
 import type { BackupSummary, RestoreOutcome } from '@/domain/backup'
 import { db } from '@/domain/db'
-import { isQuotaError, requestPersistentStorage } from '@/domain/library'
+import { isQuotaError, requestPersistentStorage, storageFullMessage } from '@/domain/library'
 import { currentPreferences, normalizePreferences, useAppSettings } from '@/store/appSettings'
 import { Switch } from '@/ui/controls'
 import { downloadFile, pickSaveTarget } from '@/ui/download'
@@ -50,7 +50,7 @@ function failure(error: unknown, action: string): string {
   if (error instanceof Error && error.name === 'BackupError') return error.message
   console.error(`could not ${action}`, error)
   if (isQuotaError(error)) {
-    return 'The browser has run out of storage space for Carrel. Free some space and try again.'
+    return `${storageFullMessage} Free some space and try again.`
   }
   return `The backup couldn’t be ${action === 'export' ? 'made' : 'restored'} because of an unexpected error. Try again.`
 }
@@ -133,18 +133,13 @@ export function BackupSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-sm leading-normal text-fg-secondary">
-        Your books are kept only in this browser, which may clear them to free space. A backup holds
-        your books, your place in each and your settings in one file, to restore here or in another
-        browser.
-      </p>
       <Switch
-        label="Include the book files"
-        description={
+        label={
           booksSize === undefined
-            ? 'Without them, the backup holds only your places and settings.'
-            : `${formatBytes(booksSize)}. Without them, the backup holds only your places and settings.`
+            ? 'Include book files'
+            : `Include book files (${formatBytes(booksSize)})`
         }
+        info="Without them, a backup keeps only your place in each book and your settings."
         checked={includeBooks}
         onChange={setIncludeBooks}
       />
@@ -156,6 +151,7 @@ export function BackupSection() {
           type="button"
           className="btn"
           disabled={busy}
+          data-restore
           onClick={() => picker.current?.click()}
         >
           Restore a backup…
@@ -176,16 +172,14 @@ export function BackupSection() {
       {state.name === 'confirming' && (
         <div className="space-y-4 rounded-lg bg-surface-sunken p-4">
           <p className="text-sm leading-normal text-fg">
-            This backup is from {date.format(state.summary.exportedAt)}. It holds{' '}
+            Backup from {date.format(state.summary.exportedAt)}:{' '}
             {plural(state.summary.books, 'book', 'books')}
             {state.summary.booksWithFiles < state.summary.books &&
-              ` (${count.format(state.summary.booksWithFiles)} with their files)`}
-            {state.summary.fonts > 0 && ` and ${plural(state.summary.fonts, 'font', 'fonts')}`}.
-            Books already in your library stay as they are.
+              ` (${count.format(state.summary.booksWithFiles)} with files)`}
+            {state.summary.fonts > 0 && `, ${plural(state.summary.fonts, 'font', 'fonts')}`}.
           </p>
           <Switch
             label="Use its theme and reading settings"
-            description="Replaces the ones you have now."
             checked={usePreferences}
             onChange={setUsePreferences}
           />
@@ -228,8 +222,7 @@ export function BackupSection() {
             <p className="text-fg-secondary">{outcomeMessage(state.outcome)}</p>
             {state.outcome.damaged.length > 0 && (
               <p className="mt-2 text-danger-fg">
-                {state.outcome.damaged.length === 1 ? 'One book was' : 'Some books were'} damaged in
-                the backup and not added: {state.outcome.damaged.join(', ')}.
+                Damaged in the backup, not added: {state.outcome.damaged.join(', ')}.
               </p>
             )}
           </>

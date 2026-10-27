@@ -31,7 +31,8 @@ import {
   type FontFile,
   type Progress,
 } from '@/domain/db'
-import { normalizeReadingSettings } from '@/domain/settings'
+import { detectFontFormat, fontFileLimit, fontNamed } from '@/domain/fonts'
+import { normalizeReadingSettings, type ReadingSettings } from '@/domain/settings'
 import { sha256 } from '@/domain/sha256'
 
 // zip.js otherwise compresses in workers started from blob: URLs, which the app's content
@@ -48,6 +49,8 @@ const version = 1
 const manifestPath = 'manifest.json'
 /** Largest manifest read into memory; a library would need far more books than fit a browser. */
 const manifestLimit = 64 * 1024 * 1024
+/** Largest cover read: covers are thumbnails, a few tens of kilobytes. */
+const coverLimit = 2 * 1024 * 1024
 
 const bookPath = (id: string) => `books/${id}`
 const coverPath = (id: string) => `covers/${id}`
@@ -56,7 +59,7 @@ const fontPath = (fontId: string, index: number) => `fonts/${fontId}/${index}`
 const notABackup = 'This isn’t a Carrel backup.'
 const damagedBackup = 'This backup is damaged.'
 const newerBackup =
-  'This backup was made by a newer version of Carrel. Update the page and try again.'
+  'This backup was made by a newer version of Carrel. Reload the page and try again.'
 
 /** The cover's fields in the manifest: all set, or all null for a book stored without one. */
 type BackupCover =
@@ -262,7 +265,8 @@ export interface RestoreOutcome {
  * added. A reading position replaces the library's when it is newer, and a book's own
  * settings are added when the book has none. Both are restored for books that are not in the
  * library too: ids are the hashes of the books' files, so they apply when that file is added
- * later. A font is added unless the library has one with the same id or the same name.
+ * later. A font is added unless the library has one with the same id or the same name; the
+ * restored settings that name it then name the library's.
  */
 export async function restoreBackup(
   file: Blob,
@@ -277,11 +281,27 @@ export async function restoreBackup(
     addedFonts: 0,
     preferences: manifest.preferences,
   }
-  await restoreBookSettings(manifest.bookSettings)
 
   const total = manifest.books.length + manifest.fonts.length
   let done = 0
   onProgress?.(done, total)
+  // A font the library has under the same name stands in for the backup's: settings that
+  // name the backup's font name the library's instead.
+  const fontIds = new Map<string, string>()
+  for (const font of manifest.fonts) {
+    const restored = await restoreFont(font, entries)
+    if (restored) fontIds.set(font.id, restored.id)
+    if (restored?.added) outcome.addedFonts++
+    onProgress?.(++done, total)
+  }
+  await restoreBookSettings(
+    manifest.bookSettings.map((record) => ({
+      ...record,
+      settings: withFontIds(record.settings, fontIds),
+    })),
+  )
+  outcome.preferences = preferencesWithFontIds(manifest.preferences, fontIds)
+
   for (const book of manifest.books) {
     if (await db.books.get(book.id)) outcome.alreadyPresent++
     else if (book.file !== null) {
@@ -292,11 +312,22 @@ export async function restoreBackup(
     }
     onProgress?.(++done, total)
   }
-  for (const font of manifest.fonts) {
-    if (await restoreFont(font, entries)) outcome.addedFonts++
-    onProgress?.(++done, total)
-  }
   return outcome
+}
+
+function withFontIds(settings: ReadingSettings, fontIds: ReadonlyMap<string, string>) {
+  const { typeface } = settings
+  if (typeof typeface !== 'object' || !('fontId' in typeface)) return settings
+  return { ...settings, typeface: { fontId: fontIds.get(typeface.fontId) ?? typeface.fontId } }
+}
+
+/** The preferences as stored, with their reading settings' font named as in the library. */
+function preferencesWithFontIds(preferences: unknown, fontIds: ReadonlyMap<string, string>) {
+  if (!isRecord(preferences) || !isRecord(preferences.reading)) return preferences
+  const { typeface } = preferences.reading
+  if (!isRecord(typeface) || typeof typeface.fontId !== 'string') return preferences
+  const fontId = fontIds.get(typeface.fontId) ?? typeface.fontId
+  return { ...preferences, reading: { ...preferences.reading, typeface: { fontId } } }
 }
 
 async function restoreProgress(records: readonly Progress[]): Promise<number> {
@@ -354,7 +385,8 @@ async function readCover(
 ): Promise<Cover | null> {
   if (book.cover === null) return null
   const entry = entries.get(book.cover)
-  const image = entry ? await readEntry(entry, book.coverType) : null
+  const image =
+    entry && entry.uncompressedSize <= coverLimit ? await readEntry(entry, book.coverType) : null
   if (!image) {
     console.warn(`restoring ${book.title} without its cover, which the backup lacks`)
     return null
@@ -362,33 +394,43 @@ async function readCover(
   return { id: book.id, image, width: book.coverWidth, height: book.coverHeight }
 }
 
+/**
+ * Adds a backup's font unless the library has it, under the same id or the same name. The
+ * id of the font in the library afterwards, or null when the backup's files for it are
+ * damaged or aren't font files the library would take.
+ */
 async function restoreFont(
   font: BackupFont,
   entries: ReadonlyMap<string, FileEntry>,
-): Promise<boolean> {
-  if (await fontExists(font)) return false
+): Promise<{ id: string; added: boolean } | null> {
+  const present = await libraryFont(font)
+  if (present) return { id: present.id, added: false }
   const files: FontFile[] = []
   for (const { path, type, ...descriptors } of font.files) {
     const entry = entries.get(path)
-    const data = entry ? await readEntry(entry, type) : null
-    if (!data) {
+    const data =
+      entry && entry.uncompressedSize <= fontFileLimit ? await readEntry(entry, type) : null
+    const kind = data
+      ? detectFontFormat(new Uint8Array(await data.slice(0, 4).arrayBuffer()))
+      : null
+    if (!data || kind === null || kind === 'collection') {
       console.warn(`skipped the font ${font.family}: its files in the backup are damaged`)
-      return false
+      return null
     }
     files.push({ data, ...descriptors })
   }
   const { id, family, source, addedAt } = font
   return db.transaction('rw', db.fonts, async () => {
-    if (await fontExists(font)) return false
+    const raced = await libraryFont(font)
+    if (raced) return { id: raced.id, added: false }
     await db.fonts.add({ id, family, source, addedAt, files })
-    return true
+    return { id, added: true }
   })
 }
 
-/** Whether the library has the font already, under the same id or the same name. */
-async function fontExists({ id, family }: { id: string; family: string }): Promise<boolean> {
-  if (await db.fonts.get(id)) return true
-  return (await db.fonts.where('family').equalsIgnoreCase(family).count()) > 0
+/** The library's copy of a font, by its id or else its name. */
+async function libraryFont({ id, family }: { id: string; family: string }) {
+  return (await db.fonts.get(id)) ?? (await fontNamed(family))
 }
 
 /** An entry's data, or null when the backup's copy of it is damaged. */
@@ -557,6 +599,7 @@ function parseBook(value: unknown): BackupBook | null {
   if (
     cover !== coverPath(id) ||
     !isText(coverType, 255) ||
+    !/^image\/[a-z0-9.+-]+$/i.test(coverType) ||
     !isDimension(coverWidth) ||
     !isDimension(coverHeight)
   ) {

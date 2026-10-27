@@ -5,6 +5,7 @@ import type { Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 import { defineConfig } from 'vitest/config'
+import { bookFileTypes } from './src/domain/formats.ts'
 
 const resolve = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 
@@ -63,7 +64,6 @@ function pwa() {
   return VitePWA({
     registerType: 'prompt',
     injectRegister: false,
-    includeAssets: ['favicon.svg', 'theme-boot.js', 'icons/*.png'],
     manifest: {
       name: 'Carrel',
       short_name: 'Carrel',
@@ -71,8 +71,8 @@ function pwa() {
       start_url: '/',
       scope: '/',
       display: 'standalone',
-      background_color: '#fafaf6',
-      theme_color: '#fafaf6',
+      background_color: '#f7f9f9',
+      theme_color: '#f7f9f9',
       icons: [
         { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
         { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -89,23 +89,21 @@ function pwa() {
       file_handlers: [
         {
           action: '/',
-          accept: {
-            'application/epub+zip': ['.epub'],
-            'application/pdf': ['.pdf'],
-            'application/x-mobipocket-ebook': ['.mobi', '.azw', '.azw3', '.kf8'],
-            'application/x-fictionbook+xml': ['.fb2'],
-            'application/x-zip-compressed-fb2': ['.fbz'],
-            'application/vnd.comicbook+zip': ['.cbz'],
-          },
+          accept: bookFileTypes,
         },
       ],
       launch_handler: { client_mode: 'focus-existing' },
     },
     workbox: {
       globPatterns: ['**/*.{html,js,mjs,css,svg,png,wasm,bcmap,pfb,ttf,woff2}'],
-      // pdf.worker.min.mjs is the largest file, a little over 1 MB.
+      // pdf.worker.min.mjs is the largest file, about 1.3 MB. Workbox's default limit, 2 MiB,
+      // leaves it little room to grow, and a file over the limit is left out of the precache
+      // with no more than a warning in the build.
       maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      // The app is one page, its routes in the hash. Other pages (the licence notices) are
+      // fetched as they are rather than answered with the app.
       navigateFallback: '/index.html',
+      navigateFallbackAllowlist: [/^\/(index\.html)?(\?|$)/],
       cleanupOutdatedCaches: true,
     },
   })
@@ -149,6 +147,12 @@ export default defineConfig({
         {
           src: ['node_modules/pdfjs-dist/LICENSE', 'node_modules/pdfjs-dist/wasm/LICENSE_*'],
           dest: 'vendor/pdfjs/licenses',
+          rename: { stripBase: true },
+        },
+        // foliate-js bundles its own copy of fflate, which licenses.md can't see.
+        {
+          src: 'node_modules/fflate/LICENSE',
+          dest: 'vendor/fflate',
           rename: { stripBase: true },
         },
       ],

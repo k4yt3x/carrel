@@ -61,12 +61,15 @@ const chapterXhtml = (
   title: string,
   extra = '',
   withFootnote = false,
+  withStylesheet = false,
+  markup = '',
 ) => `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
-<head><title>${title}</title></head>
+<head><title>${title}</title>${withStylesheet ? '<link rel="stylesheet" type="text/css" href="style.css"/>' : ''}</head>
 <body${extra ? ' onload="window.top.__bookScriptRan = true"' : ''}>
-<h1>${title}</h1>
+<h1 id="c${chapter}">${title}</h1>
 ${extra}
+${markup}
 ${withFootnote ? footnoteRef : ''}
 ${Array.from({ length: 40 }, (_, i) => paragraph(chapter, i + 1)).join('\n')}
 ${withFootnote ? footnote : ''}
@@ -78,13 +81,31 @@ interface EpubOptions {
   author: string
   /** Colour of a plain cover image; without one, the book has no cover. */
   cover?: [number, number, number]
-  /** Markup inserted into the first chapter. */
+  /** Scripts inserted into the first chapter, which also gets an onload handler and a script file. */
   extra?: string
+  /** Markup inserted into the first chapter, as it is. */
+  markup?: string
   /** Gives the first chapter a footnote. */
   footnote?: boolean
+  /** A stylesheet every chapter links to. */
+  css?: string
+  /** More of the package's metadata, as OPF elements. */
+  metadata?: string
+  /** Puts the second and third chapters in a part of their own in the contents. */
+  nested?: boolean
 }
 
-export function epub({ title, author, cover, extra = '', footnote = false }: EpubOptions): Buffer {
+export function epub({
+  title,
+  author,
+  cover,
+  extra = '',
+  markup = '',
+  footnote = false,
+  css,
+  metadata = '',
+  nested = false,
+}: EpubOptions): Buffer {
   const chapters = ['Chapter One', 'Chapter Two', 'Chapter Three']
   const manifest = chapters
     .map(
@@ -99,12 +120,14 @@ export function epub({ title, author, cover, extra = '', footnote = false }: Epu
 <dc:title>${title}</dc:title>
 <dc:creator>${author}</dc:creator>
 <dc:language>en</dc:language>
+${metadata}
 <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
 </metadata>
 <manifest>
 <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
 ${cover ? '<item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>' : ''}
 ${extra ? '<item id="js" href="evil.js" media-type="application/javascript"/>' : ''}
+${css ? '<item id="css" href="style.css" media-type="text/css"/>' : ''}
 ${manifest}
 </manifest>
 <spine>${spine}</spine>
@@ -113,7 +136,15 @@ ${manifest}
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 <head><title>Contents</title></head>
 <body><nav epub:type="toc"><ol>
-${chapters.map((name, i) => `<li><a href="c${i + 1}.xhtml">${name}</a></li>`).join('\n')}
+${
+  nested
+    ? `<li><a href="c1.xhtml">${chapters[0]}</a></li>
+<li><a href="c2.xhtml">Part Two</a><ol>
+<li><a href="c2.xhtml#c2">${chapters[1]}</a></li>
+<li><a href="c3.xhtml">${chapters[2]}</a></li>
+</ol></li>`
+    : chapters.map((name, i) => `<li><a href="c${i + 1}.xhtml">${name}</a></li>`).join('\n')
+}
 </ol></nav></body></html>`
   const files: Record<string, Uint8Array | [Uint8Array, { level: 0 }]> = {
     mimetype: [strToU8('application/epub+zip'), { level: 0 }],
@@ -126,31 +157,43 @@ ${chapters.map((name, i) => `<li><a href="c${i + 1}.xhtml">${name}</a></li>`).jo
   }
   chapters.forEach((name, i) => {
     files[`OEBPS/c${i + 1}.xhtml`] = strToU8(
-      chapterXhtml(i + 1, name, i === 0 ? extra : '', i === 0 && footnote),
+      chapterXhtml(
+        i + 1,
+        name,
+        i === 0 ? extra : '',
+        i === 0 && footnote,
+        css !== undefined,
+        i === 0 ? markup : '',
+      ),
     )
   })
   if (cover) files['OEBPS/cover.png'] = png(60, 90, cover)
+  if (css) files['OEBPS/style.css'] = strToU8(css)
   if (extra) files['OEBPS/evil.js'] = strToU8('window.top.__bookScriptRan = true')
   // A fixed date: zip entries carry their modification time, and a book built twice has to
   // come out byte for byte the same, since the library knows a book by its bytes' hash.
   return Buffer.from(zipSync(files, { mtime: new Date('2026-01-01T00:00:00Z') }))
 }
 
-/** A three-page PDF with a title and an author in its document information. */
-export function pdf(): Buffer {
+/**
+ * A three-page PDF: a heading in large type over lines of body text on each page, and, unless
+ * `info` is false, a title and an author in its document information.
+ */
+export function pdf({ info: withInfo = true }: { info?: boolean } = {}): Buffer {
   const pages = [1, 2, 3]
   const objects: string[] = []
   objects[1] = '<< /Type /Catalog /Pages 2 0 R >>'
   objects[2] = `<< /Type /Pages /Kids [${pages.map((p) => `${2 + p * 2} 0 R`).join(' ')}] /Count ${pages.length} >>`
   objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
   for (const p of pages) {
-    const stream = `BT /F1 36 Tf 72 700 Td (Page ${p} of the portable document) Tj ET`
+    const lines = Array.from({ length: 8 }, (_, n) => `(Body text, line ${n + 1}.) Tj 0 -16 Td`)
+    const stream = `BT /F1 24 Tf 72 700 Td (Page ${p} of the portable document) Tj ET BT /F1 12 Tf 72 640 Td ${lines.join(' ')} ET`
     objects[2 + p * 2] =
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${3 + p * 2} 0 R >>`
     objects[3 + p * 2] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`
   }
   const info = objects.length
-  objects[info] = '<< /Title (A Portable Document) /Author (Grace Hopper) >>'
+  if (withInfo) objects[info] = '<< /Title (A Portable Document) /Author (Grace Hopper) >>'
   let body = '%PDF-1.7\n'
   const offsets: number[] = []
   for (let n = 1; n < objects.length; n++) {
@@ -162,7 +205,7 @@ export function pdf(): Buffer {
   for (let n = 1; n < objects.length; n++) {
     body += `${String(offsets[n]).padStart(10, '0')} 00000 n \n`
   }
-  body += `trailer\n<< /Size ${objects.length} /Root 1 0 R /Info ${info} 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  body += `trailer\n<< /Size ${objects.length} /Root 1 0 R${withInfo ? ` /Info ${info} 0 R` : ''} >>\nstartxref\n${xref}\n%%EOF\n`
   return Buffer.from(body, 'latin1')
 }
 
@@ -173,6 +216,12 @@ export const fixtures = {
     buffer: epub({ title: 'The Test Book', author: 'Ada Lovelace', cover: [178, 74, 46] }),
   }),
   pdf: (): FixtureFile => ({ name: 'portable.pdf', mimeType: 'application/pdf', buffer: pdf() }),
+  /** A PDF with no document information, named by its checksum as some download sites do. */
+  anonymousPdf: (): FixtureFile => ({
+    name: 'd41d8cd98f00b204e9800998ecf8427e.pdf',
+    mimeType: 'application/pdf',
+    buffer: pdf({ info: false }),
+  }),
   scripted: (): FixtureFile => ({
     name: 'scripted.epub',
     mimeType: 'application/epub+zip',
@@ -183,10 +232,48 @@ export const fixtures = {
         '<script>window.top.__bookScriptRan = true</script><script src="evil.js"></script><img src="missing.png" onerror="window.top.__bookScriptRan = true"/><a id="js-link" href="javascript:window.top.__bookScriptRan = true">link</a>',
     }),
   }),
+  /** A book whose pages and stylesheet ask for things from a server. */
+  remote: (): FixtureFile => ({
+    name: 'remote.epub',
+    mimeType: 'application/epub+zip',
+    buffer: epub({
+      title: 'A Book That Reaches Out',
+      author: 'Eve',
+      markup:
+        '<img src="https://remote.test/pixel.png" alt=""/><video src="https://remote.test/clip.mp4"></video><object data="https://remote.test/page.html"></object>',
+      css: '@import url(https://remote.test/more.css); @font-face { font-family: Far; src: url(https://remote.test/far.woff2); } h1 { font-family: Far; background: url(https://remote.test/bg.png); }',
+    }),
+  }),
+  /** A book that says much about itself, with parts in its contents. */
+  described: (): FixtureFile => ({
+    name: 'described.epub',
+    mimeType: 'application/epub+zip',
+    buffer: epub({
+      title: 'A Described Book',
+      author: 'Mary Shelley',
+      nested: true,
+      metadata: `<dc:publisher>Lackington, Hughes</dc:publisher>
+<dc:date>1818-01-01</dc:date>
+<dc:description>&lt;p&gt;A scientist makes a creature.&lt;/p&gt;</dc:description>
+<dc:subject>Gothic fiction</dc:subject>
+<dc:subject>Science fiction</dc:subject>
+<dc:identifier opf:scheme="ISBN" xmlns:opf="http://www.idpf.org/2007/opf">978-0-14-143947-1</dc:identifier>`,
+    }),
+  }),
   annotated: (): FixtureFile => ({
     name: 'annotated.epub',
     mimeType: 'application/epub+zip',
     buffer: epub({ title: 'An Annotated Book', author: 'Hugh Thomson', footnote: true }),
+  }),
+  /** A book that sets its text in points, as print-minded stylesheets do. */
+  pointSized: (): FixtureFile => ({
+    name: 'point-sized.epub',
+    mimeType: 'application/epub+zip',
+    buffer: epub({
+      title: 'A Book Set in Points',
+      author: 'Aldus Manutius',
+      css: 'p { font-size: 12pt; } h1 { font-size: medium; }',
+    }),
   }),
   text: (): FixtureFile => ({
     name: 'notes.txt',

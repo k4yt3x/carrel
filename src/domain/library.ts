@@ -1,22 +1,9 @@
 import Dexie from 'dexie'
 import { makeThumbnail, type Thumbnail } from '@/domain/cover'
 import { type Book, db, type Progress } from '@/domain/db'
-import { loadFoliate, openBook } from '@/domain/foliate'
-import { type BookMetadata, normalizeMetadata } from '@/domain/metadata'
+import { type Book as FoliateBook, loadFoliate, openBook } from '@/domain/foliate'
+import { type BookMetadata, readMetadata, type TextRun, titleFromTextRuns } from '@/domain/metadata'
 import { sha256 } from '@/domain/sha256'
-
-/** File extensions the import picker offers. Detection itself goes by content. */
-export const bookExtensions = [
-  '.epub',
-  '.mobi',
-  '.azw',
-  '.azw3',
-  '.kf8',
-  '.fb2',
-  '.fbz',
-  '.cbz',
-  '.pdf',
-] as const
 
 /** A file that cannot be imported, with the reason worded for the person importing it. */
 export class ImportError extends Error {
@@ -25,6 +12,39 @@ export class ImportError extends Error {
 
 export interface Inspection extends BookMetadata {
   cover: Thumbnail | null
+}
+
+/** The positioned text of a PDF's first page, as PDF.js lays it out for selection. */
+async function firstPageText(book: FoliateBook): Promise<TextRun[]> {
+  const section = book.sections[0] as { createDocument?: () => Promise<Document> } | undefined
+  if (!section?.createDocument) return []
+  const doc = await section.createDocument()
+  return Array.from(doc.querySelectorAll<HTMLElement>('.textLayer span'), (span) => ({
+    text: span.textContent ?? '',
+    size: Number.parseFloat(span.style.getPropertyValue('--font-height')),
+    top: Number.parseFloat(span.style.top),
+  }))
+}
+
+/**
+ * For a book whose metadata and file name give no title: the title printed on its first page,
+ * which only a PDF (whose pages carry their text with its size and place) can give.
+ */
+async function titleFromFirstPage(book: FoliateBook): Promise<string | null> {
+  if (book.rendition?.layout !== 'pre-paginated') return null
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('reading the first page took too long')), 5000)
+    })
+    return titleFromTextRuns(await Promise.race([firstPageText(book), timeout]))
+  } catch (error) {
+    // The book is imported all the same, under its stand-in title.
+    console.warn('could not read a title from the first page', error)
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Reads a book's metadata and cover. Throws ImportError when the file is not a book. */
@@ -42,7 +62,8 @@ export async function inspectBook(file: File): Promise<Inspection> {
     throw new ImportError('It couldn’t be read as a book. The file may be damaged.')
   }
   try {
-    const metadata = normalizeMetadata(book.metadata, file.name)
+    const { titleFound, ...metadata } = readMetadata(book.metadata, file.name)
+    if (!titleFound) metadata.title = (await titleFromFirstPage(book)) ?? metadata.title
     let cover: Thumbnail | null = null
     try {
       const image = await book.getCover?.()
@@ -72,10 +93,27 @@ export interface ImportOptions {
   onProgress?: (done: number) => void
 }
 
-/** Whether an error is the browser refusing a write for lack of storage space. */
-export const isQuotaError = (error: unknown) =>
+/**
+ * Whether an error is the browser refusing a write for lack of storage space. Where the
+ * space runs out as the transaction commits, Dexie reports the abort, with the refusal inside.
+ */
+export const isQuotaError = (error: unknown): boolean =>
   error instanceof Dexie.QuotaExceededError ||
-  (error instanceof DOMException && error.name === 'QuotaExceededError')
+  (error instanceof DOMException && error.name === 'QuotaExceededError') ||
+  (error instanceof Dexie.AbortError && isQuotaError(error.inner))
+
+/** What the reader is told when a write fails for lack of storage space. */
+export const storageFullMessage = 'The browser has run out of storage space for Carrel.'
+
+/**
+ * Longest title or name kept, and most authors: far past any real book, and well inside what
+ * a backup takes back (src/domain/backup.ts), so every book in the library can be restored.
+ */
+const nameLimit = 1_000
+const authorLimit = 100
+
+const clip = (text: string) =>
+  text.length > nameLimit ? `${Array.from(text).slice(0, nameLimit).join('').trimEnd()}…` : text
 
 async function importFile(
   file: File,
@@ -84,8 +122,15 @@ async function importFile(
   const id = await sha256(file)
   const existing = await db.books.get(id)
   if (existing) return { book: existing, added: false }
-  const { cover, ...metadata } = await inspect(file)
-  const book: Book = { id, ...metadata, addedAt: Date.now(), openedAt: null }
+  const { cover, title, authors, language } = await inspect(file)
+  const book: Book = {
+    id,
+    title: clip(title),
+    authors: authors.slice(0, authorLimit).map(clip),
+    language,
+    addedAt: Date.now(),
+    openedAt: null,
+  }
   try {
     await db.transaction('rw', db.books, db.files, db.covers, async () => {
       await db.books.add(book)
@@ -121,7 +166,7 @@ export async function importFiles(
     } catch (error) {
       let reason = 'It couldn’t be added to the library.'
       if (error instanceof ImportError) reason = error.message
-      else if (isQuotaError(error)) reason = 'This browser has no storage space left for it.'
+      else if (isQuotaError(error)) reason = storageFullMessage
       else console.error(`could not import ${file.name}`, error)
       outcome.failed.push({ fileName: file.name, reason })
     }
@@ -147,9 +192,14 @@ export async function requestPersistentStorage(): Promise<void> {
 
 /** Deletes a book and everything stored with it. */
 export async function removeBook(id: string): Promise<void> {
+  await removeBooks([id])
+}
+
+/** Removes books with everything kept for them, all or none of them. */
+export async function removeBooks(ids: readonly string[]): Promise<void> {
   const tables = [db.books, db.files, db.covers, db.progress, db.bookSettings]
   await db.transaction('rw', tables, async () => {
-    await Promise.all(tables.map((table) => table.delete(id)))
+    await Promise.all(tables.map((table) => table.bulkDelete([...ids])))
   })
 }
 
