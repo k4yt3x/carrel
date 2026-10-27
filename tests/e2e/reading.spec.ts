@@ -197,6 +197,9 @@ test('shows a footnote in a popup without leaving the page', async ({ page }) =>
 })
 
 test('zooms the pages of a PDF from the keyboard and the controls', async ({ page }) => {
+  // A window taller than a page is wide, so a whole page fits at the width and the zoom is
+  // the whole of the scale.
+  await page.setViewportSize({ width: 600, height: 900 })
   await page.goto('/')
   await addBooks(page, fixtures.pdf())
   await openBook(page, 'A Portable Document')
@@ -205,10 +208,17 @@ test('zooms the pages of a PDF from the keyboard and the controls', async ({ pag
       return (view as unknown as { renderer: Element }).renderer.getAttribute('scale-factor')
     })
   await page.keyboard.press('Control+=')
-  await expect.poll(scale).toBe('125')
+  await expect.poll(scale).toBe('110')
   await press(page, 'Zoom in')
-  await expect.poll(scale).toBe('150')
-  await press(page, 'Zoom 150%, reset to fit')
+  await expect.poll(scale).toBe('125')
+  // The steps run from a tenth of the fitted size to five times it, and stop there.
+  for (let step = 0; step < 20; step++) await page.keyboard.press('Control+-')
+  await expect.poll(scale).toBe('10')
+  await expect(page.getByRole('button', { name: 'Zoom out' })).toBeDisabled()
+  for (let step = 0; step < 20; step++) await page.keyboard.press('Control+=')
+  await expect.poll(scale).toBe('500')
+  await expect(page.getByRole('button', { name: 'Zoom in' })).toBeDisabled()
+  await press(page, 'Zoom 500%, reset to fit')
   await expect.poll(scale).toBe('100')
 })
 

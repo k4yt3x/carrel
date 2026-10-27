@@ -155,6 +155,22 @@ test('on a narrow window, the contents close once a chapter is chosen', async ({
   await expect(page.getByRole('button', { name: 'Next chapter' })).toBeDisabled()
 })
 
+test('fits a whole PDF page in a wide window when scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 1800, height: 600 })
+  await page.goto('/')
+  await addBooks(page, fixtures.pdf())
+  await openBook(page, 'A Portable Document')
+  // The first page, from its top; fitted to the width it would be some 2,300 pixels tall.
+  const firstPage = () =>
+    page.locator('foliate-view').evaluate((view) => {
+      const renderer = (view as unknown as { renderer: Element }).renderer
+      const box = renderer.shadowRoot?.querySelector('iframe')?.getBoundingClientRect()
+      return box ? { top: Math.round(box.top), height: Math.round(box.height) } : null
+    })
+  await expect.poll(async () => (await firstPage())?.height).toBeLessThanOrEqual(600)
+  expect((await firstPage())?.top).toBeGreaterThanOrEqual(0)
+})
+
 test('shows a PDF page by page', async ({ page }) => {
   await page.goto('/')
   await addBooks(page, fixtures.pdf())

@@ -26,6 +26,26 @@ test('names an icon button in a tip while the pointer rests on it, until it is p
   await expect(tip).toBeHidden()
 })
 
+test('takes books dropped on the page, and puts the drop target away when a drag leaves', async ({
+  page,
+}) => {
+  const drag = await page.evaluateHandle(() => {
+    const transfer = new DataTransfer()
+    transfer.items.add(new File(['Just some notes.'], 'notes.txt', { type: 'text/plain' }))
+    return transfer
+  })
+  const target = page.getByText('Drop to add to your library')
+  // A drag that leaves without the page hearing its dragleave (the browser drops it when
+  // the pointer goes out fast) stops sending dragover all the same.
+  await page.dispatchEvent('body', 'dragenter', { dataTransfer: drag })
+  await expect(target).toBeVisible()
+  await expect(target).toBeHidden()
+  await page.dispatchEvent('body', 'dragenter', { dataTransfer: drag })
+  await page.dispatchEvent('body', 'drop', { dataTransfer: drag })
+  await expect(target).toBeHidden()
+  await expect(page.getByRole('alert')).toContainText('“notes.txt” couldn’t be added.')
+})
+
 test('adds a book with its title, author and cover', async ({ page }) => {
   await addBooks(page, fixtures.epub())
   await expect(page.getByRole('status')).toContainText('Added “The Test Book”.')

@@ -87,7 +87,7 @@ type Panel = 'search' | 'settings' | 'fonts' | 'details' | null
 const percent = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 0 })
 
 /** Zoom levels for fixed-layout pages, in percent of the fitted size. */
-const zoomSteps = [50, 75, 100, 125, 150, 200, 300, 400]
+const zoomSteps = [10, 25, 33, 50, 67, 75, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500]
 
 function nextZoom(current: number, change: 'in' | 'out' | 'reset'): number {
   if (change === 'reset') return 100
@@ -249,6 +249,30 @@ function textExtent(view: View): Extent | null {
   return { left: Math.round(rect.left), width: Math.round(rect.width) }
 }
 
+/** Space kept above and below a whole page fitted to the window's height. */
+const pageInset = 8
+
+/** The height of the tallest page of a fixed layout on show, in widths; 0 before any shows. */
+function pageShape(view: View): number {
+  let tallest = 0
+  for (const frame of view.renderer.shadowRoot?.querySelectorAll('iframe') ?? []) {
+    const box = frame.getBoundingClientRect()
+    if (box.width > 0 && box.height > 0) tallest = Math.max(tallest, box.height / box.width)
+  }
+  return tallest
+}
+
+/**
+ * The scale, from pages fitted to the window's width, that fits a whole page of this shape in
+ * the window's height. A scrolled fixed layout fits its pages to the width; on a wide window a
+ * page is then far taller than the window.
+ */
+function wholePageScale(view: View, shape: number): number {
+  const { clientWidth, clientHeight } = view.renderer
+  if (shape <= 0 || clientWidth <= 0) return 1
+  return Math.min(1, (clientHeight - 2 * pageInset) / (clientWidth * shape))
+}
+
 /**
  * Moves the text across by `shift` pixels. Paged and fixed layouts move the whole view; the
  * page background is the window's, so nothing shows at the edge it leaves. Scrolled layout
@@ -375,6 +399,13 @@ export function ReaderPage({ bookId }: { bookId: string }) {
     cancelAnimationFrame(measureFrame.current)
     measureFrame.current = requestAnimationFrame(() => {
       const view = viewRef.current
+      if (view?.isFixedLayout) {
+        const current = latest.current.settings
+        const whole = current?.flow === 'scrolled' && current.pageFit === 'page'
+        if (whole) tallestPage.current = Math.max(tallestPage.current, pageShape(view))
+        const next = whole ? wholePageScale(view, tallestPage.current) : 1
+        setPageFit((fit) => (Math.abs(fit - next) < 0.001 ? fit : next))
+      }
       const extent = view ? textExtent(view) : null
       const viewport = host.current?.clientWidth ?? window.innerWidth
       const next = extent && { ...extent, left: extent.left - appliedShift.current, viewport }
@@ -387,6 +418,10 @@ export function ReaderPage({ bookId }: { bookId: string }) {
       )
     })
   }, [])
+  // In a scrolled fixed layout fitted to the whole page: the scale, from the page's width
+  // fitted to the window's, at which the tallest page seen so far fits the window's height.
+  const [pageFit, setPageFit] = useState(1)
+  const tallestPage = useRef(0)
   const applied = useRef({ styles: '' })
   const noteDialog = useRef<HTMLDialogElement>(null)
   const noteFrame = useRef<HTMLDivElement>(null)
@@ -606,6 +641,11 @@ export function ReaderPage({ bookId }: { bookId: string }) {
       if (progress && !resolves && progress.fraction > 0) {
         await view.goToFraction(progress.fraction)
         if (cancelled) return
+      } else if (!resolves && view.isFixedLayout) {
+        // Starting afresh, the view turns one page on from nothing, which in a scrolled fixed
+        // layout scrolls a screenful down the first page.
+        await view.goToFraction(0)
+        if (cancelled) return
       }
       setStatus('ready')
       markOpened(bookId).catch((error: unknown) =>
@@ -641,6 +681,8 @@ export function ReaderPage({ bookId }: { bookId: string }) {
       cancelAnimationFrame(measureFrame.current)
       appliedShift.current = 0
       setUnmoved(null)
+      tallestPage.current = 0
+      setPageFit(1)
       setMetadata(undefined)
     }
   }, [bookId, settingsLoaded, revealNearEdge, measureText])
@@ -662,10 +704,11 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   useEffect(() => {
     const view = viewRef.current
     if (status !== 'ready' || !view?.isFixedLayout) return
+    const scale = Math.round(zoom * pageFit * 100) / 100
     // Unset is the same as 100%; setting it anyway would lay the pages out a second time.
-    if (zoom === 100 && !view.renderer.hasAttribute('scale-factor')) return
-    applyAttributes(view.renderer, { 'scale-factor': String(zoom) })
-  }, [status, zoom])
+    if (scale === 100 && !view.renderer.hasAttribute('scale-factor')) return
+    applyAttributes(view.renderer, { 'scale-factor': String(scale) })
+  }, [status, zoom, pageFit])
 
   // The window resizing lays the book out again, which measures it; a fixed layout may only
   // scale its pages, so it is measured here as well.

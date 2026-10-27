@@ -17,7 +17,14 @@ interface ImportState {
 
 let queue = Promise.resolve()
 
-export const useImports = create<ImportState>()((set) => ({
+/**
+ * How long a result with nothing wrong stays up. It is counted from the result, wherever the
+ * reader is meanwhile (reading the book just added, say), so it isn't waiting on their return.
+ * Failures stay until dismissed.
+ */
+export const resultShownMs = 6000
+
+export const useImports = create<ImportState>()((set, get) => ({
   notice: null,
   add(files, unread = []) {
     if (files.length === 0 && unread.length === 0) return
@@ -29,7 +36,13 @@ export const useImports = create<ImportState>()((set) => ({
           onProgress: (done) => set({ notice: { kind: 'progress', done, total } }),
         })
         outcome.failed.push(...unread)
-        set({ notice: { kind: 'result', outcome } })
+        const notice: ImportNotice = { kind: 'result', outcome }
+        set({ notice })
+        if (outcome.failed.length === 0) {
+          setTimeout(() => {
+            if (get().notice === notice) set({ notice: null })
+          }, resultShownMs)
+        }
       })
       .catch((error: unknown) => {
         // importFiles reports per-file failures itself; this is a failure of the whole run.

@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react'
 const carriesFiles = (event: DragEvent) => event.dataTransfer?.types.includes('Files') ?? false
 
 /**
+ * How long the page waits for the next dragover before taking the drag to have left. The
+ * browser sends one every 50 ms while files are held over the page, moving or not.
+ */
+const dragGoneMs = 300
+
+/**
  * Accepts books dropped anywhere on the page, and says so while files are dragged over it.
  */
 export function DropOverlay({ onDrop }: { onDrop(files: File[]): void }) {
@@ -11,28 +17,42 @@ export function DropOverlay({ onDrop }: { onDrop(files: File[]): void }) {
 
   useEffect(() => {
     // dragenter and dragleave fire for every element crossed, so count rather than toggle.
+    // A count can go astray (an element leaving the page mid-drag takes its dragleave with
+    // it), so the drag also has to keep reporting in.
     let depth = 0
+    let gone: ReturnType<typeof setTimeout> | undefined
+    const end = () => {
+      clearTimeout(gone)
+      depth = 0
+      setActive(false)
+    }
+    const stillHere = () => {
+      clearTimeout(gone)
+      gone = setTimeout(end, dragGoneMs)
+    }
     const enter = (event: DragEvent) => {
       if (!carriesFiles(event)) return
       event.preventDefault()
       depth += 1
       setActive(true)
+      stillHere()
     }
     const over = (event: DragEvent) => {
       if (!carriesFiles(event)) return
       event.preventDefault()
       if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+      setActive(true)
+      stillHere()
     }
     const leave = (event: DragEvent) => {
       if (!carriesFiles(event)) return
       depth = Math.max(0, depth - 1)
-      if (depth === 0) setActive(false)
+      if (depth === 0) end()
     }
     const drop = (event: DragEvent) => {
       if (!carriesFiles(event)) return
       event.preventDefault()
-      depth = 0
-      setActive(false)
+      end()
       onDrop([...(event.dataTransfer?.files ?? [])])
     }
     window.addEventListener('dragenter', enter)
@@ -40,6 +60,7 @@ export function DropOverlay({ onDrop }: { onDrop(files: File[]): void }) {
     window.addEventListener('dragleave', leave)
     window.addEventListener('drop', drop)
     return () => {
+      clearTimeout(gone)
       window.removeEventListener('dragenter', enter)
       window.removeEventListener('dragover', over)
       window.removeEventListener('dragleave', leave)

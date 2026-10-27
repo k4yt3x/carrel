@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-27
+
+### Changed
+
+- PDFs and comics zoom from 10% to 500% of the fitted size, in finer steps around 100%.
+
+### Fixed
+
+- The notice that books were added goes after a few seconds, even if a book is opened meanwhile.
+- The drop target goes away when files dragged over the page are taken away without a drop.
+- Scrolled PDFs and comics fit a whole page to the window's height under Whole page.
+- A PDF or comic opened for the first time in scrolled layout starts at the top of its first page.
+
 ## [0.1.0] - 2026-10-27
 
 ### Added
@@ -35,5 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tips that name the icon-only buttons, with their keyboard shortcuts.
 - Keys: the arrows, Page Up, Page Down and Space turn pages; Ctrl+F searches the book.
 
-[Unreleased]: https://github.com/k4yt3x/carrel/compare/0.1.0...HEAD
+[Unreleased]: https://github.com/k4yt3x/carrel/compare/0.1.1...HEAD
+[0.1.1]: https://github.com/k4yt3x/carrel/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/k4yt3x/carrel/releases/tag/0.1.0

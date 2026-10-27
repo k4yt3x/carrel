@@ -1,5 +1,4 @@
 import { CircleAlert, CircleCheck, X } from 'lucide-react'
-import { useEffect } from 'react'
 import type { ImportOutcome } from '@/domain/library'
 import { useImports } from '@/store/imports'
 
@@ -33,19 +32,14 @@ function summarize({ added, duplicates, failed }: ImportOutcome): string[] {
 }
 
 const shownFailures = 3
-const autoDismissMs = 6000
 
-/** Reports an import as it runs and how it went. Failures stay until dismissed. */
+/**
+ * Reports an import as it runs and how it went. A result goes by itself unless something
+ * failed (see resultShownMs); failures stay until dismissed.
+ */
 export function ImportNotice() {
   const notice = useImports((state) => state.notice)
   const dismiss = useImports((state) => state.dismiss)
-  const settled = notice?.kind === 'result' && notice.outcome.failed.length === 0
-
-  useEffect(() => {
-    if (!settled) return
-    const timer = setTimeout(dismiss, autoDismissMs)
-    return () => clearTimeout(timer)
-  }, [settled, dismiss])
 
   if (!notice) return null
 
