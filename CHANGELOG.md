@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A new icon: a study carrel, a desk walled on three sides.
+
 ## [0.1.1] - 2026-10-27
 
 ### Changed

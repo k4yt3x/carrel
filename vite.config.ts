@@ -82,7 +82,6 @@ function pwa() {
           type: 'image/png',
           purpose: 'maskable',
         },
-        { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
       ],
       // Opening a book file with the installed app adds it to the library
       // (src/ui/useLaunchFiles.ts).

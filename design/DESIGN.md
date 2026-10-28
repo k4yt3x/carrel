@@ -17,9 +17,9 @@ same tokens as plain custom properties). `preview.html` shows the scales.
 | Dense ↔ spacious  | Spacious      | Generous gaps on the shelf (48 px between rows) and around the empty state                                                                                                                        |
 
 The interface has no accent hue. The primary action, the current place in a list and focus
-are drawn in the theme's own greys at their strongest contrast, so the book covers are the only
-colour on screen. Hue is kept for danger and warning, where it carries
-meaning.
+are drawn in the theme's own greys at their strongest contrast, so the book covers, and the icon
+beside the wordmark, are the only colour on screen. Hue is kept for danger and warning, where
+it carries meaning.
 
 ## Colour
 
@@ -182,22 +182,15 @@ later, as they do after the book opens.
 
 ## Icons
 
-The icon is a C, for Carrel: three sides of a square with rounded corners, open to the right,
-holding an open book. It is three bold, flat shapes in one colour (`neutral.50`) on
-`neutral.900`, so the letter and the book still read at 16 px and the icon sits as quietly in
-a tab strip as the interface does on screen. In the interface itself (`src/ui/CarrelMark.tsx`,
-beside the wordmark) it takes the theme's text and page colours.
+The icon is a carrel, the study desk the app is named for: a desk walled on three sides, with
+a chair drawn up to it. It is flat, in the warm browns of wood, and it sits beside the
+wordmark in the library's header. The chair is a mid-tone slate rather than near-black, so it
+stays visible on a dark tab strip or theme as well as a light one.
 
-`public/favicon.svg` is the icon; `design/icon-maskable.svg` is its full-bleed variant for
-platforms that crop icons to their own shape, with the C and the book drawn at 80% to stay
-inside the safe zone. The PNGs in `public/icons/` are rendered from them:
-
-```sh
-rsvg-convert -w 192 -h 192 public/favicon.svg -o public/icons/icon-192.png
-rsvg-convert -w 512 -h 512 public/favicon.svg -o public/icons/icon-512.png
-rsvg-convert -w 512 -h 512 design/icon-maskable.svg -o public/icons/maskable-512.png
-rsvg-convert -w 180 -h 180 design/icon-maskable.svg -o public/icons/apple-touch-icon.png
-```
+`design/icon.webp` is the artwork. Run `sh design/icons.sh` (ImageMagick 7) after changing it;
+that renders the PNGs in `public/icons/`: the favicon, the app's icons, and, on `neutral.50`,
+the full-bleed variant for platforms that crop icons to their own shape and the Apple touch
+icon.
 
 ## Adding to the system
 

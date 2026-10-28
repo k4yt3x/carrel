@@ -31,7 +31,6 @@ import { loadBookFile, removeBook, removeBooks } from '@/domain/library'
 import { useImports } from '@/store/imports'
 import { useLibraryView } from '@/store/libraryView'
 import { BookDetailsDialog } from '@/ui/BookDetails'
-import { CarrelMark } from '@/ui/CarrelMark'
 import { ConfirmDialog } from '@/ui/ConfirmDialog'
 import { downloadFile } from '@/ui/download'
 import { BookCard, BookRow, listColumns } from '@/ui/library/BookCard'
@@ -238,7 +237,14 @@ export function LibraryPage() {
         ) : (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-4 sm:gap-x-6">
             <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight text-fg max-sm:order-1">
-              <CarrelMark className="size-8 shrink-0" />
+              <img
+                src="/icons/icon-192.png"
+                alt=""
+                width={32}
+                height={32}
+                draggable={false}
+                className="size-8 shrink-0"
+              />
               Carrel
             </h1>
             {hasBooks && (
