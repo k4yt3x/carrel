@@ -2,11 +2,13 @@
  * Design brief (refactoring-ui Workflow B), library settings.
  *
  * Feature: the settings that belong to the whole app rather than to reading one book.
- * Sections in the order people come for them: Theme, Fonts, Backup, Storage. Reading
+ * Sections in the order people come for them: Theme, Fonts, Backup, Storage, then About, which
+ * is for looking up rather than changing: the version, and where the source code is. Reading
  * settings themselves live in the reader, next to the page they change.
  * Tokens: section titles 12px semibold uppercase fg-muted, 32px above each section.
  */
 
+import { ExternalLink } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useAppSettings } from '@/store/appSettings'
 import { FontManager } from '@/ui/fonts/FontManager'
@@ -35,6 +37,8 @@ function Section({
     </section>
   )
 }
+
+const sourceUrl = 'https://github.com/k4yt3x/carrel'
 
 interface LibrarySettingsProps {
   open: boolean
@@ -70,6 +74,22 @@ export function LibrarySettings({ open, restore = false, onClose }: LibrarySetti
       </Section>
       <Section title="Storage">
         <StorageSection open={open} />
+      </Section>
+      <Section title="About">
+        <div className="space-y-2 text-sm leading-normal">
+          <p className="text-fg-secondary">Carrel {__CARREL_VERSION__}</p>
+          {/* Out of the app, so an installed one stays where it was. */}
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded-sm text-action-fg underline decoration-border-strong underline-offset-4 hover:decoration-current"
+          >
+            Source code on GitHub
+            <ExternalLink aria-hidden className="size-3" />
+            <span className="sr-only">(opens in a new tab)</span>
+          </a>
+        </div>
       </Section>
     </Modal>
   )

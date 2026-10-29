@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-29
+
 ### Added
 
 - Home and End go to the beginning and the end of the book.
+- Settings show Carrel's version and link to its source code.
 
 ### Changed
 
@@ -81,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tips that name the icon-only buttons, with their keyboard shortcuts.
 - Keys: the arrows, Page Up, Page Down and Space turn pages; Ctrl+F searches the book.
 
-[Unreleased]: https://github.com/k4yt3x/carrel/compare/0.1.1...HEAD
+[Unreleased]: https://github.com/k4yt3x/carrel/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/k4yt3x/carrel/compare/0.1.1...0.2.0
 [0.1.1]: https://github.com/k4yt3x/carrel/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/k4yt3x/carrel/releases/tag/0.1.0

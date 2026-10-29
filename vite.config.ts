@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
@@ -8,6 +9,11 @@ import { defineConfig } from 'vitest/config'
 import { bookFileTypes } from './src/domain/formats.ts'
 
 const resolve = (path: string) => fileURLToPath(new URL(path, import.meta.url))
+
+// Shown in the settings; a release is tagged with the same version.
+const { version } = JSON.parse(readFileSync(resolve('./package.json'), 'utf8')) as {
+  version: string
+}
 
 /**
  * The content security policy of the built app.
@@ -118,6 +124,9 @@ function pwa() {
 }
 
 export default defineConfig({
+  define: {
+    __CARREL_VERSION__: JSON.stringify(version),
+  },
   plugins: [
     react(),
     tailwindcss(),

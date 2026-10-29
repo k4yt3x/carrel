@@ -180,6 +180,15 @@ test('clears backup files once their downloads have had time to finish', async (
   expect(Date.now() - Number.parseInt(kept ?? '', 10)).toBeLessThan(60 * 60 * 1000)
 })
 
+test('names its version and links to its source code', async ({ page }) => {
+  const { version } = JSON.parse(await readFile('package.json', 'utf8')) as { version: string }
+  const settings = await openSettings(page)
+  await expect(settings.getByText(`Carrel ${version}`, { exact: true })).toBeVisible()
+  const source = settings.getByRole('link', { name: /^Source code on GitHub/ })
+  await expect(source).toHaveAttribute('href', 'https://github.com/k4yt3x/carrel')
+  await expect(source).toHaveAttribute('target', '_blank')
+})
+
 test('refuses a file that isn’t a backup', async ({ page }) => {
   const settings = await openSettings(page)
   await settings.locator('input[type="file"][accept*=".zip"]').setInputFiles({
