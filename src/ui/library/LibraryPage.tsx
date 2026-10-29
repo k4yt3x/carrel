@@ -8,22 +8,35 @@
  *   tertiary   the book's format, a quiet tag like the welcome screen's; search, sort, the
  *              per-book menu
  * Actions: one primary, "Add books" (in the empty state it is the page's only action, so
- *   the header copy is hidden there); search, sort and the covers/list switch are secondary;
+ *   the header copy is hidden there); search, sort, the covers/list switch and Select are
+ *   secondary. The header groups the controls by what they act on: the books on show
+ *   (search narrows them, sort orders them, the switch shows them, Select picks among them),
+ *   then the library and the app (Add books, settings), each control 40px tall;
  *   downloading and removing a book are tertiary and sit behind each book's menu; settings
  *   (theme, fonts, backup, storage) are a quiet icon at the end of the header.
- * Choosing several books: "Select" (or Select in a book's menu) puts the library in a mode
+ * Choosing several books: Select (or Select in a book's menu) puts the library in a mode
  *   where a click chooses a book instead of opening it, Shift-click chooses a run of them, and
  *   the header becomes a bar for the choice: how many, Select all, Remove. Escape or the close
  *   button leaves it. The mark of a chosen book takes the place of its menu.
  * List: it runs the width of the header, in columns that fill it on wider screens (author,
- *   progress, then the days last read and added), under headings that sort by them.
+ *   format, progress, then the days last read and added), under headings that sort by them.
  * Tokens: page bg-surface; text tiers fg / fg-secondary / fg-muted; weights 400 and 600;
  *   covers radius-sm with shadow-md, raised to shadow-lg on hover; grid gaps 24/32 across
  *   and 48 down, so a cover sits closer to its own caption than to the row below.
  */
 
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowDown, LayoutGrid, List, Plus, Search, Settings, Trash2, X } from 'lucide-react'
+import {
+  ArrowDown,
+  CircleCheck,
+  LayoutGrid,
+  List,
+  Plus,
+  Search,
+  Settings,
+  Trash2,
+  X,
+} from 'lucide-react'
 import {
   lazy,
   Suspense,
@@ -113,6 +126,7 @@ export function LibraryPage() {
   const setLayout = useLibraryView((state) => state.setLayout)
   const addFiles = useImports((state) => state.add)
   const [query, setQuery] = useState('')
+  const searchInput = useRef<HTMLInputElement>(null)
   const [removing, setRemoving] = useState<Book | null>(null)
   const [detailed, setDetailed] = useState<Book | null>(null)
   // Choosing books for an action: which are chosen, and the one clicked last, where a
@@ -194,6 +208,20 @@ export function LibraryPage() {
   }, [])
   const selectAll = useCallback(() => setSelected(new Set(shown.map((book) => book.id))), [shown])
 
+  // Ctrl+F (or Command+F) goes to the library's search, as it searches the book in the reader.
+  useEffect(() => {
+    if (!hasBooks) return
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return
+      if (event.key.toLowerCase() !== 'f') return
+      if (event.target instanceof Element && event.target.closest('dialog')) return
+      event.preventDefault()
+      searchInput.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [hasBooks])
+
   // While choosing, Escape stops and Ctrl+A (or Command+A) chooses every book on show. Keys
   // meant for a dialog or a field are left to it.
   useEffect(() => {
@@ -263,8 +291,8 @@ export function LibraryPage() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-4 sm:gap-x-6">
-            <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight text-fg max-sm:order-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-4">
+            <h1 className="me-auto flex items-center gap-3 text-2xl font-semibold tracking-tight text-fg max-sm:order-1">
               <img
                 src="/icons/icon-192.png"
                 alt=""
@@ -277,18 +305,20 @@ export function LibraryPage() {
             </h1>
             {hasBooks && (
               <>
-                {/* Search and sort take a row of their own until the window is wide enough for
-                    the whole toolbar on one. On a phone the toolbar is three rows: the name and
-                    the actions, search, then how the books are arranged. */}
-                <div className="order-last flex w-full gap-3 max-sm:contents lg:order-none lg:ms-auto lg:w-auto">
+                {/* What acts on the books on show (search, sort, covers or list, Select): beside
+                    Add books on a wide window, on a row of their own under it until then. On a
+                    phone, search takes a line to itself, and the rest share the next. */}
+                <div className="order-last flex w-full items-center gap-3 max-sm:contents lg:order-none lg:w-auto">
                   <label className="input min-w-0 flex-1 bg-surface-sunken max-sm:order-4 max-sm:basis-full lg:w-64 lg:flex-none">
                     <Search aria-hidden className="size-4 text-fg-muted" />
                     <input
+                      ref={searchInput}
                       type="search"
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Search"
                       aria-label="Search your library"
+                      aria-keyshortcuts="Control+F"
                     />
                   </label>
                   <select
@@ -305,41 +335,43 @@ export function LibraryPage() {
                       </option>
                     ))}
                   </select>
+                  <fieldset className="flex rounded-md bg-surface-track p-1 max-sm:order-6">
+                    <legend className="sr-only">Show books as</legend>
+                    {(
+                      [
+                        ['grid', 'Covers', LayoutGrid],
+                        ['list', 'List', List],
+                      ] as const
+                    ).map(([value, label, Icon]) => (
+                      <label key={value} data-tooltip={label}>
+                        <input
+                          type="radio"
+                          name="library-layout"
+                          className="peer sr-only"
+                          checked={layout === value}
+                          aria-label={label}
+                          onChange={() => setLayout(value)}
+                        />
+                        <span className="grid size-8 cursor-pointer place-items-center rounded-sm text-fg-muted hover:text-fg peer-checked:bg-surface-selected peer-checked:text-fg peer-checked:shadow-sm peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus">
+                          <Icon aria-hidden className="size-4" />
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                  {/* Last, as it acts on the books the others have found, put in order and shown. */}
+                  <button
+                    ref={selectButton}
+                    type="button"
+                    className="btn max-sm:order-7 max-sm:ms-auto"
+                    onClick={() => startSelecting()}
+                  >
+                    <CircleCheck aria-hidden className="size-4" />
+                    Select
+                  </button>
                 </div>
                 <button
-                  ref={selectButton}
                   type="button"
-                  className="btn btn-ghost ms-auto max-sm:order-6 lg:ms-0"
-                  onClick={() => startSelecting()}
-                >
-                  Select
-                </button>
-                <fieldset className="flex rounded-md bg-surface-track p-1 max-sm:order-7">
-                  <legend className="sr-only">Show books as</legend>
-                  {(
-                    [
-                      ['grid', 'Covers', LayoutGrid],
-                      ['list', 'List', List],
-                    ] as const
-                  ).map(([value, label, Icon]) => (
-                    <label key={value} data-tooltip={label}>
-                      <input
-                        type="radio"
-                        name="library-layout"
-                        className="peer sr-only"
-                        checked={layout === value}
-                        aria-label={label}
-                        onChange={() => setLayout(value)}
-                      />
-                      <span className="grid size-8 cursor-pointer place-items-center rounded-sm text-fg-muted hover:text-fg peer-checked:bg-surface-selected peer-checked:text-fg peer-checked:shadow-sm peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus">
-                        <Icon aria-hidden className="size-4" />
-                      </span>
-                    </label>
-                  ))}
-                </fieldset>
-                <button
-                  type="button"
-                  className="btn btn-primary max-sm:order-2 max-sm:ms-auto"
+                  className="btn btn-primary max-sm:order-2 lg:ms-3"
                   onClick={pickFiles}
                 >
                   <Plus aria-hidden className="size-4" />
@@ -349,12 +381,12 @@ export function LibraryPage() {
             )}
             <button
               type="button"
-              className={`btn btn-ghost btn-square -me-2 max-sm:order-3 ${hasBooks ? '' : 'ms-auto'}`}
+              className="btn btn-ghost btn-square -me-2 max-sm:order-3"
               aria-label="Settings"
               data-tooltip=""
               onClick={() => setSettings('open')}
             >
-              <Settings aria-hidden className="size-6" />
+              <Settings aria-hidden className="size-5" />
             </button>
           </div>
         )}

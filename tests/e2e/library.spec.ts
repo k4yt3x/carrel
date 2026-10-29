@@ -120,6 +120,15 @@ test('finds books by title or author', async ({ page }) => {
   await expect(page.getByRole('listitem')).toHaveCount(2)
 })
 
+test('goes to the search with Ctrl+F', async ({ page }) => {
+  await addBooks(page, fixtures.epub(), fixtures.pdf())
+  await expect(page.getByRole('listitem')).toHaveCount(2)
+  await page.keyboard.press('Control+f')
+  await expect(page.getByRole('searchbox', { name: 'Search your library' })).toBeFocused()
+  await page.keyboard.type('hopper')
+  await expect(page.getByRole('listitem')).toHaveCount(1)
+})
+
 test('names a book by its first page when nothing else names it', async ({ page }) => {
   await addBooks(page, fixtures.anonymousPdf())
   await expect(page.getByRole('status')).toContainText('Added “Page 1 of the portable document”.')

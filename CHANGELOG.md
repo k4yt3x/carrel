@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
 ### Added
 
 - Plain-text (TXT) books, in any common encoding, divided into chapters at their headings.
 - Each book in the library is labelled with its format: EPUB, PDF, TXT and so on.
+- Ctrl+F (or ⌘F) in the library goes to its search.
+
+### Changed
+
+- The library's header is tidier: Select is a button, grouped with search, sort and covers or list.
 
 ## [0.2.0] - 2026-10-29
 
@@ -82,7 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tips that name the icon-only buttons, with their keyboard shortcuts.
 - Keys: the arrows, Page Up, Page Down and Space turn pages; Ctrl+F searches the book.
 
-[Unreleased]: https://github.com/k4yt3x/carrel/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/k4yt3x/carrel/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/k4yt3x/carrel/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/k4yt3x/carrel/compare/0.1.1...0.2.0
 [0.1.1]: https://github.com/k4yt3x/carrel/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/k4yt3x/carrel/releases/tag/0.1.0
