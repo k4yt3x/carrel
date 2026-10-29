@@ -4,8 +4,9 @@
  * Feature: read. The page is the figure; everything else stays out of its way.
  * Content, by rank:
  *   primary    the book page
- *   secondary  where you are: the progress in the page's corner and, in paged layout, the
- *              chapter in the running head, set small and muted
+ *   secondary  where you are: the progress in the page's corner and the chapter in the
+ *              running head, set small and muted in bands above and below the text, as tall
+ *              as the bars, so the bars come up over the bands rather than the text
  *   tertiary   the controls, out of sight until a tap in the middle of the page, the pointer
  *              nearing the top or bottom edge, or keyboard focus brings them up
  * Actions: no primary action. Back, contents, search, reading settings, full screen and the
@@ -48,12 +49,23 @@ import { type Book, loadFoliate, openBook } from '@/domain/foliate'
 import { cssString, fontCssFamily } from '@/domain/fonts'
 import { loadBookFile, markOpened, saveProgress } from '@/domain/library'
 import { libraryHref } from '@/domain/routes'
-import { type ReadingSettings, type Typeface, tocWidthLimits } from '@/domain/settings'
+import {
+  defaultReadingSettings,
+  type ReadingSettings,
+  type Typeface,
+  tocWidthLimits,
+} from '@/domain/settings'
 import { useAppSettings } from '@/store/appSettings'
 import { BookDetailsDialog } from '@/ui/BookDetails'
 import { FontsDialog } from '@/ui/fonts/FontsDialog'
 import { FootnotePopup, type Note, presentNote } from '@/ui/reader/FootnotePopup'
-import { applyAttributes, fixedLayoutAttributes, paginatorAttributes } from '@/ui/reader/layout'
+import {
+  applyAttributes,
+  barHeight,
+  fixedLayoutAttributes,
+  paginatorAttributes,
+  textBands,
+} from '@/ui/reader/layout'
 import {
   createWheelHandler,
   handleKey,
@@ -131,20 +143,34 @@ function createProgressSaver(id: string, onSaved: (error: unknown) => void) {
 }
 
 /**
- * Running heads in the top margin of paged layout: in a two-page spread the left page carries
- * the book's title and the right the chapter's, as in a printed book. The progress has a
- * corner of its own (see progressText), in every layout.
+ * The running head over a column of text, as the header setting says. Under 'chapter', the
+ * left page of a two-page spread carries the book's title, as in a printed book, and a page
+ * outside any chapter carries it too.
+ */
+function runningHead(
+  header: ReadingSettings['header'],
+  title: string,
+  position: RelocateDetail | null,
+  leftOfSpread: boolean,
+): string {
+  if (header === 'book' || (header === 'chapter' && leftOfSpread)) return title
+  if (header === 'chapter') return position?.tocItem?.label?.trim() || title
+  return ''
+}
+
+/**
+ * Running heads in the top margin of paged layout, which foliate-js lays out one to a page.
+ * Scrolled layout has no pages to carry them, so the reader draws its one head itself.
  */
 function fillRunningHeads(
   renderer: Renderer,
   title: string,
   detail: RelocateDetail,
-  shown: boolean,
+  header: ReadingSettings['header'],
 ) {
   const heads = renderer.heads ?? []
-  const chapter = detail.tocItem?.label?.trim() ?? ''
   heads.forEach((head, index) => {
-    head.textContent = !shown ? '' : heads.length > 1 && index === 0 ? title : chapter || title
+    head.textContent = runningHead(header, title, detail, heads.length > 1 && index === 0)
   })
 }
 
@@ -178,17 +204,21 @@ function startsBook(position: RelocateDetail): boolean {
 }
 
 /**
- * What the corner of the page says of the reader's progress. A page is a real page in a fixed
- * layout; in a reflowable book it is one of foliate-js's locations, a fixed length of text, so
- * the numbers stay put whatever the text size or window.
+ * What the corner of the page says of the reader's progress, as the footer setting says, and
+ * while the scrubber is dragged, where it would go. A page is a real page in a fixed layout; in
+ * a reflowable book it is one of foliate-js's locations, a fixed length of text, so the numbers
+ * stay put whatever the text size or window.
  */
 function progressText(
   position: RelocateDetail | null,
   fixedLayout: boolean,
-  mode: ReadingSettings['progress'],
+  footer: ReadingSettings['footer'],
+  scrub: number | null,
 ): string {
-  if (!position || mode === 'none') return ''
-  if (mode === 'page') {
+  if (footer === 'blank' || footer === 'hide') return ''
+  if (scrub !== null) return percent.format(scrub)
+  if (!position) return ''
+  if (footer === 'page') {
     const pages = fixedLayout ? position.section : position.location
     if (pages && pages.total > 0) {
       return `${count.format(Math.min(pages.total, pages.current + 1))} / ${count.format(pages.total)}`
@@ -367,6 +397,10 @@ function applyAppearance(view: View, appearance: Appearance, applied: { styles: 
   applyAttributes(view.renderer, paginatorAttributes(settings, reducedMotion()))
   // index.css widens the scroller in scrolled layout by this.
   view.dataset.flow = settings.flow
+  // The scroller ends at the bands, so the text scrolls between them, and a screenful down
+  // brings on the lines that were hidden below.
+  const bands = textBands(settings)
+  view.style.paddingBlock = settings.flow === 'scrolled' ? `${bands.top}px ${bands.bottom}px` : ''
   const styles = pageStyles({ theme: currentPageTheme(scheme), settings, fontFamily, fontFaces })
   const key = styles.join('\n')
   if (key === applied.styles) return
@@ -673,8 +707,8 @@ export function ReaderPage({ bookId }: { bookId: string }) {
         if (!Number.isFinite(detail.fraction)) return
         setPosition(detail)
         saver.schedule({ location: detail.cfi, fraction: detail.fraction })
-        const shown = latest.current.settings?.runningHeads ?? true
-        if (view) fillRunningHeads(view.renderer, latest.current.title, detail, shown)
+        const header = latest.current.settings?.header ?? defaultReadingSettings.header
+        if (view) fillRunningHeads(view.renderer, latest.current.title, detail, header)
       })
       view.addEventListener('load', (event) => {
         const { doc } = event.detail
@@ -789,8 +823,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
     if (status !== 'ready' || !view || !settings) return
     applyAppearance(view, { settings, scheme, fontFamily, fontFaces }, applied.current)
     const current = latest.current.position
-    if (current)
-      fillRunningHeads(view.renderer, latest.current.title, current, settings.runningHeads)
+    if (current) fillRunningHeads(view.renderer, latest.current.title, current, settings.header)
     measureText()
   }, [status, settings, scheme, palette, fontFamily, fontFaces, measureText])
 
@@ -899,10 +932,12 @@ export function ReaderPage({ bookId }: { bookId: string }) {
     [pages, position],
   )
   const atEnd = pages ? pages.current >= pages.total - 1 : (position?.fraction ?? 0) >= 0.9999
-  const progress =
-    scrub !== null && settings?.progress !== 'none'
-      ? percent.format(scrub)
-      : progressText(position, fixedLayout, settings?.progress ?? 'percent')
+  const progress = progressText(
+    position,
+    fixedLayout,
+    settings?.footer ?? defaultReadingSettings.footer,
+    scrub,
+  )
   // The progress of a fixed layout sits beside the page's bottom corner, off the page, where the
   // window has room for it there (and for a scrollbar at its edge); else in the page's corner.
   const progressLabel = useRef<HTMLParagraphElement>(null)
@@ -912,6 +947,13 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   }, [status, progress])
   const pageRight = unmoved ? unmoved.left + shift + unmoved.width : 0
   const besidePage = unmoved !== null && unmoved.viewport - pageRight >= progressWidth + 32
+  const bands = settings ? textBands(settings) : null
+  const head = settings ? runningHead(settings.header, record?.title ?? '', position, false) : ''
+  // Where reflowable text runs across the window, for what lines up with it in the bands.
+  const textSpan = unmoved && {
+    left: `calc(${unmoved.left + shift}px + env(safe-area-inset-left))`,
+    width: unmoved.width,
+  }
 
   const openPanel = (next: Panel) => {
     setChromeShown(false)
@@ -1034,7 +1076,10 @@ export function ReaderPage({ bookId }: { bookId: string }) {
           >
             {/* The title sits in the middle of the window, between the controls on either side,
                 with the book's details beside it. */}
-            <div className="grid h-[44px] grid-cols-[1fr_auto_1fr] items-center gap-2 px-2 sm:px-4">
+            <div
+              className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-2 sm:px-4"
+              style={{ height: barHeight }}
+            >
               <div className="flex items-center gap-1">
                 <a
                   href={libraryHref}
@@ -1121,8 +1166,9 @@ export function ReaderPage({ bookId }: { bookId: string }) {
             }`}
           >
             {/* From the left: the beginning, the previous chapter, the progress across the
-                window, the next chapter, the end. The figure itself is in the page's corner. */}
-            <div className="flex h-[44px] items-center gap-1 px-2 sm:px-4">
+                window and its figure (the bar covers the one in the page's corner), the next
+                chapter, the end. */}
+            <div className="flex items-center gap-1 px-2 sm:px-4" style={{ height: barHeight }}>
               <button
                 type="button"
                 className="btn btn-ghost btn-square btn-sm shrink-0"
@@ -1161,6 +1207,11 @@ export function ReaderPage({ bookId }: { bookId: string }) {
                 onKeyUp={commitScrub}
                 onBlur={commitScrub}
               />
+              {progress && (
+                <span aria-hidden className="shrink-0 text-xs text-fg-muted tabular-nums">
+                  {progress}
+                </span>
+              )}
               {chapters.length > 0 && (
                 <button
                   type="button"
@@ -1224,36 +1275,43 @@ export function ReaderPage({ bookId }: { bookId: string }) {
             </div>
           </footer>
 
-          {/* The progress, in the corner of the page as a folio would be, and above the bottom
-              bar while the bar is up. For reflowable text it sits in a strip of page colour as
-              wide as the text, a bottom margin the text scrolls under rather than runs into; on
-              the pages of a fixed layout, in a small label beside the page's corner, or in it. */}
+          {/* foliate-js draws the running heads of paged layout in the page's top margin;
+              scrolled layout's one head sits in the band above the text. */}
+          {scrolledText && head && bands && textSpan && (
+            <p
+              aria-hidden
+              className="pointer-events-none absolute top-[env(safe-area-inset-top)] z-10 truncate text-center text-xs text-fg-muted"
+              style={{ ...textSpan, height: bands.top, lineHeight: `${bands.top}px` }}
+            >
+              {head}
+            </p>
+          )}
+          {/* The progress, in the corner of the page as a folio would be, where the bottom bar
+              covers it and shows it beside the scrubber. For reflowable text it sits in the band
+              below the text, at the text's end; on the pages of a fixed layout, in a small label
+              beside the page's corner, or in it. */}
           {progress && (
             <p
               ref={progressLabel}
               aria-hidden
-              className={`pointer-events-none absolute z-10 bg-surface text-xs whitespace-nowrap text-fg-muted tabular-nums transition-[bottom] duration-200 ease-out ${
-                fixedLayout || !unmoved ? 'rounded-sm px-1' : 'h-6 text-end leading-6'
+              className={`pointer-events-none absolute bottom-[env(safe-area-inset-bottom)] z-10 text-xs whitespace-nowrap text-fg-muted tabular-nums ${
+                fixedLayout ? 'mb-1 rounded-sm bg-surface px-1' : 'text-end'
               }`}
-              style={{
-                bottom: `calc(${chromeShown ? 44 : 0}px + env(safe-area-inset-bottom))`,
-                ...(unmoved && !fixedLayout
+              style={
+                !fixedLayout && bands
                   ? {
-                      left: `calc(${unmoved.left + shift}px + env(safe-area-inset-left))`,
-                      width: unmoved.width,
+                      ...(textSpan ?? { right: 'calc(16px + env(safe-area-inset-right))' }),
+                      height: bands.bottom,
+                      lineHeight: `${bands.bottom}px`,
                     }
                   : besidePage
-                    ? {
-                        left: `calc(${pageRight + 8}px + env(safe-area-inset-left))`,
-                        marginBottom: 4,
-                      }
+                    ? { left: `calc(${pageRight + 8}px + env(safe-area-inset-left))` }
                     : {
                         right: `calc(${
                           unmoved ? Math.max(4, unmoved.viewport - pageRight) : 16
                         }px + env(safe-area-inset-right))`,
-                        marginBottom: 4,
-                      }),
-              }}
+                      }
+              }
             >
               {progress}
             </p>

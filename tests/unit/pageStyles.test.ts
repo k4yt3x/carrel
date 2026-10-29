@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { defaultReadingSettings, type ReadingSettings } from '@/domain/settings'
-import { applyAttributes, fixedLayoutAttributes, paginatorAttributes } from '@/ui/reader/layout'
+import {
+  applyAttributes,
+  barHeight,
+  fixedLayoutAttributes,
+  paginatorAttributes,
+  textBands,
+} from '@/ui/reader/layout'
 import { type PageTheme, pageStyles, textShiftProperty } from '@/ui/reader/pageStyles'
 import { schemeOf } from '@/ui/useTheme'
 
@@ -73,6 +79,27 @@ describe('pageStyles', () => {
   })
 })
 
+describe('textBands', () => {
+  const bands = (settings: Partial<ReadingSettings>) =>
+    textBands({ ...defaultReadingSettings, ...settings })
+
+  it('gives the header and the footer bands as tall as the bars, blank or not', () => {
+    expect(bands({ flow: 'paginated' })).toEqual({ top: barHeight, bottom: barHeight })
+    expect(bands({ flow: 'scrolled', header: 'blank', footer: 'blank' })).toEqual({
+      top: barHeight,
+      bottom: barHeight,
+    })
+    expect(bands({ flow: 'scrolled', header: 'hide' })).toEqual({ top: 0, bottom: barHeight })
+    expect(bands({ flow: 'scrolled', footer: 'hide' })).toEqual({ top: barHeight, bottom: 0 })
+  })
+
+  it('leaves a page’s margin where a band is hidden, and nothing in scrolled layout', () => {
+    const hidden = { header: 'hide', footer: 'hide' } as const
+    expect(bands({ flow: 'paginated', ...hidden })).toEqual({ top: 24, bottom: 24 })
+    expect(bands({ flow: 'scrolled', ...hidden })).toEqual({ top: 0, bottom: 0 })
+  })
+})
+
 describe('paginatorAttributes', () => {
   // Paged layout unless a test says otherwise; the default is scrolled.
   const attributes = (settings: Partial<ReadingSettings> = {}, reducedMotion = false) =>
@@ -91,10 +118,19 @@ describe('paginatorAttributes', () => {
     })
   })
 
-  it('keeps room for running heads only where they are drawn', () => {
-    expect(attributes()['margin-top']).toBe('48px')
-    expect(attributes({ runningHeads: false })['margin-top']).toBe('24px')
-    expect(attributes({ flow: 'scrolled' })['margin-top']).toBe('24px')
+  it('makes the bands the page’s margins in paged layout only', () => {
+    expect(attributes({ header: 'hide' })).toMatchObject({
+      'margin-top': '24px',
+      'margin-bottom': `${barHeight}px`,
+    })
+    expect(attributes({ footer: 'hide' })).toMatchObject({
+      'margin-top': `${barHeight}px`,
+      'margin-bottom': '24px',
+    })
+    expect(attributes({ flow: 'scrolled' })).toMatchObject({
+      'margin-top': '24px',
+      'margin-bottom': '24px',
+    })
   })
 
   it('animates page turns unless they are off or the system asks for less motion', () => {

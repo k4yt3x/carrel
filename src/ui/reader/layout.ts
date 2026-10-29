@@ -7,16 +7,36 @@ import type { ReadingSettings } from '@/domain/settings'
 
 type Attributes = Record<string, string | null>
 
+/** The height of the reader's bars, in CSS pixels. */
+export const barHeight = 44
+
+/** A page's margin above or below its text where its band is hidden. */
+const bareMargin = 24
+
+/**
+ * The bands above and below a reflowable book's text, in CSS pixels: the header and the footer,
+ * as tall as the bars, which come up over the bands rather than over the text. A hidden one
+ * leaves a page's margin in paged layout, and nothing in scrolled layout.
+ */
+export function textBands(settings: ReadingSettings): { top: number; bottom: number } {
+  const bare = settings.flow === 'scrolled' ? 0 : bareMargin
+  return {
+    top: settings.header === 'hide' ? bare : barHeight,
+    bottom: settings.footer === 'hide' ? bare : barHeight,
+  }
+}
+
 /** Attributes for reflowable books (EPUB, MOBI, FB2...), laid out by the paginator. */
 export function paginatorAttributes(settings: ReadingSettings, reducedMotion: boolean): Attributes {
-  const scrolled = settings.flow === 'scrolled'
-  // The top margin holds the running head, which only paged layout draws; the bottom one
-  // matches it.
-  const blockMargin = !scrolled && settings.runningHeads ? '48px' : '24px'
+  // In paged layout the bands are the page's margins. A scroller spans its margins, so in
+  // scrolled layout the reader keeps the bands outside it; there the margins only pad vertical
+  // text, across the scroll.
+  const bands =
+    settings.flow === 'scrolled' ? { top: bareMargin, bottom: bareMargin } : textBands(settings)
   return {
     flow: settings.flow,
-    'margin-top': blockMargin,
-    'margin-bottom': blockMargin,
+    'margin-top': `${bands.top}px`,
+    'margin-bottom': `${bands.bottom}px`,
     'margin-left': `${settings.sideMargin}px`,
     'margin-right': `${settings.sideMargin}px`,
     'max-inline-size': `${settings.maxColumnWidth}px`,

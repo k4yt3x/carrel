@@ -48,13 +48,17 @@ export interface ReadingSettings {
   sideMargin: number
   pageTurn: 'slide' | 'curl' | 'none'
   tapToTurn: boolean
-  /** Book title and chapter in the page margins. */
-  runningHeads: boolean
   /**
-   * What the corner of the page says of the reader's progress: the percentage, the page (of a
-   * fixed layout, or of the text in fixed lengths), or nothing.
+   * The band above reflowable text: the chapter's title (the book's over the left page of a
+   * spread, as in print), the book's title, the band left empty, or no band.
    */
-  progress: 'percent' | 'page' | 'none'
+  header: 'book' | 'chapter' | 'blank' | 'hide'
+  /**
+   * The band below reflowable text, and the corner of a fixed layout's page: the reader's
+   * progress as a percentage or a page (of a fixed layout, or of the text in fixed lengths), the
+   * band left empty, or no band.
+   */
+  footer: 'percent' | 'page' | 'blank' | 'hide'
   /** How fixed-layout books (PDF, comics) fit the window. */
   pageFit: 'page' | 'width'
   /** Whether fixed-layout books show facing pages side by side. */
@@ -79,8 +83,8 @@ export const defaultReadingSettings: ReadingSettings = {
   sideMargin: 16,
   pageTurn: 'slide',
   tapToTurn: true,
-  runningHeads: true,
-  progress: 'percent',
+  header: 'chapter',
+  footer: 'percent',
   pageFit: 'page',
   spreads: 'auto',
   customCss: '',
@@ -152,6 +156,17 @@ function typeface(value: unknown): Typeface {
   return defaultReadingSettings.typeface
 }
 
+/**
+ * The footer of settings saved before it was a choice: from the progress, whose 'none' left no
+ * band, or in settings older still, from the switch for the running heads, which hid the
+ * progress with them.
+ */
+function earlierFooter(value: Record<string, unknown>): ReadingSettings['footer'] {
+  if (value.progress === 'percent' || value.progress === 'page') return value.progress
+  if (value.progress === 'none') return 'hide'
+  return value.runningHeads === false ? 'hide' : defaultReadingSettings.footer
+}
+
 export function normalizeReadingSettings(raw: unknown): ReadingSettings {
   const value = isRecord(raw) ? raw : {}
   const d = defaultReadingSettings
@@ -173,13 +188,13 @@ export function normalizeReadingSettings(raw: unknown): ReadingSettings {
     sideMargin: number('sideMargin', value.sideMargin),
     pageTurn: oneOf(['slide', 'curl', 'none'], value.pageTurn, d.pageTurn),
     tapToTurn: bool('tapToTurn', d.tapToTurn),
-    runningHeads: bool('runningHeads', d.runningHeads),
-    // Stored settings with no choice for the progress hid it along with the running heads.
-    progress: oneOf(
-      ['percent', 'page', 'none'],
-      value.progress,
-      value.progress === undefined && value.runningHeads === false ? 'none' : d.progress,
+    // Settings saved before the header was a choice had a switch for the running heads.
+    header: oneOf(
+      ['book', 'chapter', 'blank', 'hide'],
+      value.header,
+      value.runningHeads === false ? 'hide' : d.header,
     ),
+    footer: oneOf(['percent', 'page', 'blank', 'hide'], value.footer, earlierFooter(value)),
     pageFit: oneOf(['page', 'width'], value.pageFit, d.pageFit),
     spreads: oneOf(['auto', 'none'], value.spreads, d.spreads),
     customCss:

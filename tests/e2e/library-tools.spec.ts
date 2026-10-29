@@ -180,10 +180,13 @@ test('clears backup files once their downloads have had time to finish', async (
   expect(Date.now() - Number.parseInt(kept ?? '', 10)).toBeLessThan(60 * 60 * 1000)
 })
 
-test('names its version and links to its source code', async ({ page }) => {
+test('names its version and build, and links to its source code', async ({ page }) => {
   const { version } = JSON.parse(await readFile('package.json', 'utf8')) as { version: string }
+  await expect(page.getByRole('banner').getByText(`v${version}`, { exact: true })).toBeVisible()
   const settings = await openSettings(page)
   await expect(settings.getByText(`Carrel ${version}`, { exact: true })).toBeVisible()
+  // The tests build from a git checkout: the commit, and whether the tree differed from it.
+  await expect(settings.getByText(/^Build [0-9a-f]{7,}( \(dirty\))?$/)).toBeVisible()
   const source = settings.getByRole('link', { name: /^Source code on GitHub/ })
   await expect(source).toHaveAttribute('href', 'https://github.com/k4yt3x/carrel')
   await expect(source).toHaveAttribute('target', '_blank')

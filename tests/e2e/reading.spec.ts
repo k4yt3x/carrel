@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Locator, type Page, test } from '@playwright/test'
 import { type FixtureFile, fixtures } from './fixtures'
 
 const addBooks = async (page: Page, ...files: FixtureFile[]) => {
@@ -375,18 +375,103 @@ test('scrolls from anywhere on the page; the progress bar runs the width of the 
   expect(bar?.width ?? 0).toBeGreaterThan(width * 0.75)
 })
 
-test('shows the progress in the corner of the page, as the reader chooses', async ({ page }) => {
+test('shows the progress in the footer, as the reader chooses', async ({ page }) => {
   await page.goto('/')
   await addBooks(page, fixtures.epub())
   await openBook(page, 'The Test Book')
   const corner = page.locator('p[aria-hidden]').filter({ hasText: /^\d+%$|^[\d,]+ \/ [\d,]+$/ })
   await expect(corner).toHaveText(/^\d+%$/)
   await press(page, 'Reading settings')
-  const settings = page.getByRole('dialog', { name: 'Reading settings' })
-  await settings.getByText('Page', { exact: true }).click()
+  const footer = page
+    .getByRole('dialog', { name: 'Reading settings' })
+    .getByRole('group', { name: /^Footer/ })
+  await footer.getByText('Page', { exact: true }).click()
   await expect(corner).toHaveText(/^1 \/ \d+$/)
-  await settings.getByText('None', { exact: true }).click()
+  await footer.getByText('Blank', { exact: true }).click()
   await expect(corner).toHaveCount(0)
+  await footer.getByText('Percent', { exact: true }).click()
+  await footer.getByText('Hide', { exact: true }).click()
+  await expect(corner).toHaveCount(0)
+})
+
+test('keeps the header and the footer in bands the bars come up over', async ({ page }) => {
+  await page.goto('/')
+  await addBooks(page, fixtures.epub())
+  await openBook(page, 'The Test Book')
+  const { width, height } = page.viewportSize() ?? { width: 1280, height: 720 }
+  const box = async (locator: Locator) => {
+    const found = await locator.boundingBox()
+    return found && { top: found.y, bottom: found.y + found.height }
+  }
+  const head = page.locator('p[aria-hidden]', { hasText: 'Chapter One' })
+  const corner = page.locator('p[aria-hidden]', { hasText: /^\d+%$/ })
+  // Scrolled, the text scrolls between the bands, and a screenful is what shows between them.
+  const scroller = () =>
+    page.locator('foliate-view').evaluate((view) => {
+      const renderer = (view as unknown as { renderer: Element }).renderer
+      const rect = renderer.shadowRoot?.getElementById('container')?.getBoundingClientRect()
+      return rect && { top: rect.top, bottom: rect.bottom }
+    })
+  await expect.poll(scroller).toEqual({ top: 44, bottom: height - 44 })
+  await expect.poll(() => box(head)).toEqual({ top: 0, bottom: 44 })
+  await expect.poll(() => box(corner)).toEqual({ top: height - 44, bottom: height })
+
+  // The bars cover the bands exactly, and the bottom one has the figure the band had.
+  await page.mouse.move(width / 2, height - 10)
+  await expect.poll(() => box(page.locator('header'))).toEqual({ top: 0, bottom: 44 })
+  await expect.poll(() => box(page.locator('footer'))).toEqual({ top: height - 44, bottom: height })
+  await expect(page.locator('footer')).toContainText(/\d+%/)
+  await expect.poll(() => box(corner)).toEqual({ top: height - 44, bottom: height })
+  await page.mouse.move(width / 2, height / 2)
+
+  // In pages the bands are the page's margins, and the paginator's head sits in the top one.
+  const margins = () =>
+    page.locator('foliate-view').evaluate((view) => {
+      const renderer = (
+        view as unknown as { renderer: Element & { getContents(): { doc: Document }[] } }
+      ).renderer
+      const root = renderer.getContents()[0]?.doc.documentElement
+      const style = root && getComputedStyle(root)
+      const header = renderer.shadowRoot?.getElementById('header')?.getBoundingClientRect()
+      return { top: style?.paddingTop, bottom: style?.paddingBottom, head: header?.height }
+    })
+  await press(page, 'Reading settings')
+  const settings = page.getByRole('dialog', { name: 'Reading settings' })
+  const choose = (setting: string, choice: string) =>
+    settings
+      .getByRole('group', { name: new RegExp(`^${setting}`) })
+      .getByText(choice, { exact: true })
+      .click()
+  await choose('Reading mode', 'Pages')
+  await expect.poll(margins).toEqual({ top: '44px', bottom: '44px', head: 44 })
+  await expect.poll(() => box(corner)).toEqual({ top: height - 44, bottom: height })
+
+  // Facing pages: the book's title over the left one and the chapter's over the right, as in
+  // print, unless the header is the book's.
+  const heads = () =>
+    page.locator('foliate-view').evaluate((view) => {
+      const renderer = (view as unknown as { renderer: { heads: Element[] | null } }).renderer
+      return (renderer.heads ?? []).map((head) => head.textContent)
+    })
+  await expect.poll(heads).toEqual(['The Test Book', 'Chapter One'])
+  await choose('Header', 'Book')
+  await expect.poll(heads).toEqual(['The Test Book', 'The Test Book'])
+
+  // Blank keeps the bands, with nothing in them; Hide leaves a page's margin, and in scrolled
+  // layout, nothing.
+  await choose('Header', 'Blank')
+  await choose('Footer', 'Blank')
+  await expect.poll(heads).toEqual(['', ''])
+  await expect(corner).toHaveCount(0)
+  await expect.poll(margins).toMatchObject({ top: '44px', bottom: '44px' })
+  await choose('Reading mode', 'Scroll')
+  await expect.poll(scroller).toEqual({ top: 44, bottom: height - 44 })
+  await expect(page.locator('p[aria-hidden]')).toHaveCount(0)
+  await choose('Header', 'Hide')
+  await choose('Footer', 'Hide')
+  await expect.poll(scroller).toEqual({ top: 0, bottom: height })
+  await choose('Reading mode', 'Pages')
+  await expect.poll(margins).toMatchObject({ top: '24px', bottom: '24px' })
 })
 
 test('goes to the beginning and the end of the book from the bottom bar', async ({ page }) => {

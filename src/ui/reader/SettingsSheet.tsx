@@ -229,40 +229,45 @@ export function SettingsSheet({
               onChange={(value) => set('sideMargin', value)}
             />
             {paginated && (
-              <>
-                <Segmented
-                  legend="Page turn"
-                  value={settings.pageTurn}
-                  options={[
-                    { value: 'slide', label: 'Slide' },
-                    { value: 'curl', label: 'Curl' },
-                    { value: 'none', label: 'Instant' },
-                  ]}
-                  onChange={(value) => set('pageTurn', value)}
-                />
-                <Switch
-                  label="Running heads"
-                  info="The book and chapter titles above the text."
-                  checked={settings.runningHeads}
-                  onChange={(value) => set('runningHeads', value)}
-                />
-              </>
+              <Segmented
+                legend="Page turn"
+                value={settings.pageTurn}
+                options={[
+                  { value: 'slide', label: 'Slide' },
+                  { value: 'curl', label: 'Curl' },
+                  { value: 'none', label: 'Instant' },
+                ]}
+                onChange={(value) => set('pageTurn', value)}
+              />
             )}
+            <Segmented
+              legend="Header"
+              value={settings.header}
+              options={[
+                { value: 'book', label: 'Book' },
+                { value: 'chapter', label: 'Chapter' },
+                { value: 'blank', label: 'Blank' },
+                { value: 'hide', label: 'Hide' },
+              ]}
+              onChange={(value) => set('header', value)}
+              info="With Chapter, the left of two facing pages has the book’s title. Blank keeps the space empty, so the bars never cover the text; Hide lets the text use it."
+            />
           </>
         )}
         <Segmented
-          legend="Progress"
-          value={settings.progress}
+          legend="Footer"
+          value={settings.footer}
           options={[
             { value: 'percent', label: 'Percent' },
             { value: 'page', label: 'Page' },
-            { value: 'none', label: 'None' },
+            { value: 'blank', label: 'Blank' },
+            { value: 'hide', label: 'Hide' },
           ]}
-          onChange={(value) => set('progress', value)}
+          onChange={(value) => set('footer', value)}
           info={
             fixedLayout
               ? 'Shown in the corner of the page.'
-              : 'Shown in the corner of the page. Pages here are fixed lengths of text, so their numbers stay the same at any text size.'
+              : 'Pages here are fixed lengths of text, so their numbers stay the same at any text size. Blank keeps the space empty, so the bars never cover the text; Hide lets the text use it.'
           }
         />
         {textOffset && (

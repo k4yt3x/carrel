@@ -77,7 +77,15 @@ export function LibrarySettings({ open, restore = false, onClose }: LibrarySetti
       </Section>
       <Section title="About">
         <div className="space-y-2 text-sm leading-normal">
-          <p className="text-fg-secondary">Carrel {__CARREL_VERSION__}</p>
+          <div>
+            <p className="text-fg-secondary">Carrel {__CARREL_VERSION__}</p>
+            {__CARREL_BUILD__ && (
+              <p className="text-fg-muted">
+                Build <span className="font-mono">{__CARREL_BUILD__.commit}</span>
+                {__CARREL_BUILD__.dirty && ' (dirty)'}
+              </p>
+            )}
+          </div>
           {/* Out of the app, so an installed one stays where it was. */}
           <a
             href={sourceUrl}

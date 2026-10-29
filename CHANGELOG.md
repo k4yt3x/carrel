@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-29
+
+### Added
+
+- The header shows in Scroll mode too, and can show the book's title instead of the chapter's.
+- Header and Footer can be Blank, keeping their band empty so the bars never cover the text.
+- The library shows Carrel's version beside its name, on screens wider than a phone's.
+- Settings name the commit Carrel was built from, marked dirty if it had uncommitted changes.
+
+### Changed
+
+- Running heads and Progress are now Header and Footer, in bands as tall as the bars.
+- The bars come up over these bands instead of the text, and the bottom bar shows the progress.
+- In Scroll mode the text scrolls between the bands, no longer under the progress.
+- Hide, in place of None, removes a band and gives its space to the text.
+- The library's icon and title are as tall as the controls beside them.
+
 ## [0.3.0] - 2026-10-29
 
 ### Added
@@ -89,7 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tips that name the icon-only buttons, with their keyboard shortcuts.
 - Keys: the arrows, Page Up, Page Down and Space turn pages; Ctrl+F searches the book.
 
-[Unreleased]: https://github.com/k4yt3x/carrel/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/k4yt3x/carrel/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/k4yt3x/carrel/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/k4yt3x/carrel/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/k4yt3x/carrel/compare/0.1.1...0.2.0
 [0.1.1]: https://github.com/k4yt3x/carrel/compare/0.1.0...0.1.1

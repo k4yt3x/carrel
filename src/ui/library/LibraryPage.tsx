@@ -292,17 +292,27 @@ export function LibraryPage() {
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-4">
-            <h1 className="me-auto flex items-center gap-3 text-2xl font-semibold tracking-tight text-fg max-sm:order-1">
+            {/* The icon is as tall as the controls beside it, which daisyUI sizes from
+                --size-field. The version stays out of the heading, and a phone has no room for
+                it on the row. */}
+            <div className="me-auto flex items-center gap-3 max-sm:order-1">
               <img
                 src="/icons/icon-192.png"
                 alt=""
-                width={32}
-                height={32}
+                width={40}
+                height={40}
                 draggable={false}
-                className="size-8 shrink-0"
+                className="size-[calc(var(--size-field)*10)] shrink-0"
               />
-              Carrel
-            </h1>
+              <div className="flex items-baseline gap-2">
+                <h1 className="text-3xl leading-tight font-semibold tracking-tight text-fg">
+                  Carrel
+                </h1>
+                <span className="text-sm text-fg-muted/80 max-sm:hidden">
+                  v{__CARREL_VERSION__}
+                </span>
+              </div>
+            </div>
             {hasBooks && (
               <>
                 {/* What acts on the books on show (search, sort, covers or list, Select): beside

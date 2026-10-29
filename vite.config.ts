@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
@@ -13,6 +14,34 @@ const resolve = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 // Shown in the settings; a release is tagged with the same version.
 const { version } = JSON.parse(readFileSync(resolve('./package.json'), 'utf8')) as {
   version: string
+}
+
+/**
+ * The commit the app is built from, and whether the working tree differs from it (anything
+ * `git status` lists), for the settings to show beside the version. Null where the source
+ * isn't a git checkout, such as an unpacked release archive, which builds all the same.
+ */
+function gitBuild(): { commit: string; dirty: boolean } | null {
+  const root = realpathSync(resolve('./'))
+  const git = (...args: string[]) =>
+    execFileSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  try {
+    // An archive unpacked inside some other checkout would otherwise take that one's commit.
+    if (realpathSync(git('rev-parse', '--show-toplevel')) !== root) {
+      throw new Error(`${root} is not the top of a git checkout`)
+    }
+    return {
+      commit: git('rev-parse', '--short', 'HEAD'),
+      dirty: git('status', '--porcelain') !== '',
+    }
+  } catch (error) {
+    console.warn(`Building without the git commit: ${(error as Error).message}`)
+    return null
+  }
 }
 
 /**
@@ -126,6 +155,7 @@ function pwa() {
 export default defineConfig({
   define: {
     __CARREL_VERSION__: JSON.stringify(version),
+    __CARREL_BUILD__: JSON.stringify(gitBuild()),
   },
   plugins: [
     react(),

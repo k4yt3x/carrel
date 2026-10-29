@@ -62,12 +62,26 @@ describe('normalizeReadingSettings', () => {
     )
   })
 
-  it('keeps the progress hidden for settings that hid it with the running heads', () => {
-    expect(normalizeReadingSettings({ runningHeads: false }).progress).toBe('none')
-    expect(normalizeReadingSettings({ runningHeads: true }).progress).toBe('percent')
-    expect(normalizeReadingSettings({ runningHeads: false, progress: 'page' }).progress).toBe(
-      'page',
-    )
+  it('carries the running heads and progress of earlier settings over to the header and footer', () => {
+    expect(normalizeReadingSettings({ runningHeads: true, progress: 'page' })).toMatchObject({
+      header: 'chapter',
+      footer: 'page',
+    })
+    expect(normalizeReadingSettings({ runningHeads: false, progress: 'percent' })).toMatchObject({
+      header: 'hide',
+      footer: 'percent',
+    })
+    expect(normalizeReadingSettings({ runningHeads: true, progress: 'none' })).toMatchObject({
+      header: 'chapter',
+      footer: 'hide',
+    })
+    // Before the progress was a choice, hiding the running heads hid it too.
+    expect(normalizeReadingSettings({ runningHeads: false }).footer).toBe('hide')
+    expect(normalizeReadingSettings({ runningHeads: true }).footer).toBe('percent')
+    // Settings saved since keep their own choice.
+    expect(
+      normalizeReadingSettings({ header: 'book', footer: 'blank', runningHeads: false }),
+    ).toMatchObject({ header: 'book', footer: 'blank' })
   })
 
   it('cuts an overlong custom stylesheet rather than storing it', () => {
