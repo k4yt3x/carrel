@@ -6,13 +6,18 @@
  */
 
 /**
- * 'up' and 'down' are the arrow keys: a page in paged layout, a few lines in scrolled layout,
- * as arrow keys scroll anywhere else.
+ * 'prev' and 'next' are a page: Page Up and Page Down, the wheel in paged layout. 'left' and
+ * 'right' are the arrow keys and taps on the sides of the page. 'up' and 'down' are the arrow
+ * keys: a page in paged layout, a few lines in scrolled layout, as arrow keys scroll anywhere
+ * else. 'screenUp' and 'screenDown' are Space and Shift+Space: a screenful, which in paged
+ * layout is a page.
  */
-export type Turn = 'prev' | 'next' | 'left' | 'right' | 'up' | 'down'
+export type Turn = 'prev' | 'next' | 'left' | 'right' | 'up' | 'down' | 'screenUp' | 'screenDown'
 
 export interface Navigator {
   turn(direction: Turn): void
+  /** Home and End: the beginning and the end of the book. */
+  goToEdge(edge: 'start' | 'end'): void
   toggleChrome(): void
   hideChrome(): void
   openSearch(): void
@@ -69,10 +74,13 @@ export function handleKey(event: KeyboardEvent, navigator: Navigator): void {
     return
   }
   let turn = keyTurns[event.key]
-  if (event.key === ' ') turn = event.shiftKey ? 'prev' : 'next'
+  if (event.key === ' ') turn = event.shiftKey ? 'screenUp' : 'screenDown'
   if (turn) {
     event.preventDefault()
     navigator.turn(turn)
+  } else if (event.key === 'Home' || event.key === 'End') {
+    event.preventDefault()
+    navigator.goToEdge(event.key === 'Home' ? 'start' : 'end')
   } else if (
     event.key === 'Enter' &&
     !(event.target instanceof Element && event.target.closest(interactive))

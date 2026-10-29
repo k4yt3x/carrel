@@ -181,10 +181,15 @@ would otherwise cover it.
 
 In paged layout, running heads (book title on the left page, chapter on the right) sit in the
 top margin in 12 px `fg-muted`, as in a printed book. The progress, as a percentage or a page
-number or not at all, sits in the page's bottom corner like a folio, in every layout. The
-controls are on two 44 px bars that come up with a tap in the middle of the page, with the
+number or not at all, sits in the page's bottom corner like a folio, in every layout; for a PDF
+or comic, just beside the corner, off the page, where the window has room. The controls are on two 44 px bars that come up with a tap in the middle of the page, with the
 pointer near the top or bottom edge, or with keyboard focus, and step aside a few seconds
 later, as they do after the book opens.
+
+A scrolled PDF or comic moves as a PDF viewer does (`src/ui/reader/pageSteps.ts`). Page Down and
+Page Up put a page's top at the top of the window, so a page fitted whole fills the window
+exactly. Space reads a page taller than the window a screenful at a time, stopping where its
+bottom meets the window's, then goes to the top of the next page rather than straddling two.
 
 ## Icons
 

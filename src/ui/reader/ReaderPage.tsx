@@ -60,8 +60,10 @@ import {
   handleTap,
   type Navigator,
   openExternal,
+  type Turn,
   viewportPoint,
 } from '@/ui/reader/navigation'
+import { pageTarget, type StripPage, screenTarget } from '@/ui/reader/pageSteps'
 import {
   currentPageTheme,
   pageStyles,
@@ -252,9 +254,6 @@ function textExtent(view: View): Extent | null {
 /** The renderer's scale-factor, in percent: the zoom applied to the page fit. */
 const scalePercent = (zoom: number, fit: number) => Math.round(zoom * fit * 100) / 100
 
-/** Space kept above and below a whole page fitted to the window's height. */
-const pageInset = 8
-
 /** The height of the tallest page of a fixed layout on show, in widths; 0 before any shows. */
 function pageShape(view: View): number {
   let tallest = 0
@@ -266,14 +265,53 @@ function pageShape(view: View): number {
 }
 
 /**
- * The scale, from pages fitted to the window's width, that fits a whole page of this shape in
- * the window's height. A scrolled fixed layout fits its pages to the width; on a wide window a
- * page is then far taller than the window.
+ * The scale, from pages fitted to the window's width, that fits a whole page of this shape to
+ * the window's height, exactly, so a page put at the top of the window fills it. A scrolled
+ * fixed layout fits its pages to the width; on a wide window a page is then far taller than
+ * the window.
  */
 function wholePageScale(view: View, shape: number): number {
   const { clientWidth, clientHeight } = view.renderer
   if (shape <= 0 || clientWidth <= 0) return 1
-  return Math.min(1, (clientHeight - 2 * pageInset) / (clientWidth * shape))
+  return Math.min(1, clientHeight / (clientWidth * shape))
+}
+
+/** The pages of a scrolled fixed layout laid out around the window, in order. */
+function stripPages(view: View): StripPage[] {
+  const pages: StripPage[] = []
+  for (const page of view.renderer.shadowRoot?.querySelectorAll<HTMLElement>('.scroll-page') ??
+    []) {
+    const index = Number(page.dataset.index)
+    const start = Number.parseFloat(page.style.top)
+    const size = Number.parseFloat(page.style.height)
+    if ([index, start, size].every(Number.isFinite)) pages.push({ index, start, size })
+  }
+  return pages.sort((a, b) => a.index - b.index)
+}
+
+/**
+ * Turns in a scrolled fixed layout: a page lines up with the top of the window, rather than the
+ * window moving on by its own height and leaving pages cut across it (src/ui/reader/pageSteps.ts).
+ */
+function stepStrip(view: View, direction: Exclude<Turn, 'up' | 'down'>) {
+  const scroller = view.renderer
+  const pages = stripPages(view)
+  const top = scroller.scrollTop
+  if (direction === 'screenUp' || direction === 'screenDown') {
+    const way = direction === 'screenDown' ? 'next' : 'prev'
+    scroller.scrollTop = screenTarget(pages, top, scroller.clientHeight, way)
+    return
+  }
+  const forward = direction === 'next' || direction === (view.book.dir === 'rtl' ? 'left' : 'right')
+  const target = pageTarget(pages, top, forward ? 'next' : 'prev', view.book.sections.length)
+  if (target !== null) {
+    scroller.goTo({ index: target }).catch((error: unknown) => {
+      console.error('could not turn the page', error)
+    })
+  } else if (forward) {
+    // The last page: down to its end, should it be taller than the window.
+    scroller.scrollTop = scroller.scrollHeight
+  }
 }
 
 /**
@@ -507,6 +545,10 @@ export function ReaderPage({ bookId }: { bookId: string }) {
             .catch((error: unknown) => console.error('could not scroll the page', error))
           return
         }
+        if (!vertical && scrolled && view.isFixedLayout) {
+          stepStrip(view, direction)
+          return
+        }
         // In scrolled layout an arrow key moves a few lines; a page there is a screenful.
         const line = scrolled ? arrowScroll : undefined
         let turning: Promise<void>
@@ -514,9 +556,15 @@ export function ReaderPage({ bookId }: { bookId: string }) {
         else if (direction === 'right') turning = view.goRight()
         else if (direction === 'up') turning = view.prev(line)
         else if (direction === 'down') turning = view.next(line)
-        else if (direction === 'prev') turning = view.prev()
+        else if (direction === 'prev' || direction === 'screenUp') turning = view.prev()
         else turning = view.next()
         turning.catch((error: unknown) => console.error('could not turn the page', error))
+      },
+      goToEdge(edge) {
+        setChromeShown(false)
+        view
+          ?.goToFraction(edge === 'start' ? 0 : 1)
+          .catch((error: unknown) => console.error('could not go to the edge of the book', error))
       },
       toggleChrome: () => setChromeShown((shown) => !shown),
       hideChrome: () => setChromeShown(false),
@@ -624,6 +672,9 @@ export function ReaderPage({ bookId }: { bookId: string }) {
           textShiftProperty,
           `${scrolled ? appliedShift.current : 0}px`,
         )
+        // The pages of a fixed layout come and go as the reader moves through them; what is on
+        // show is measured again once one has loaded.
+        if (view?.isFixedLayout) measureText()
         doc.addEventListener('keydown', onKey)
         doc.addEventListener('wheel', onWheel, { passive: true })
         doc.addEventListener('click', (click) =>
@@ -836,6 +887,15 @@ export function ReaderPage({ bookId }: { bookId: string }) {
     scrub !== null && settings?.progress !== 'none'
       ? percent.format(scrub)
       : progressText(position, fixedLayout, settings?.progress ?? 'percent')
+  // The progress of a fixed layout sits beside the page's bottom corner, off the page, where the
+  // window has room for it there (and for a scrollbar at its edge); else in the page's corner.
+  const progressLabel = useRef<HTMLParagraphElement>(null)
+  const [progressWidth, setProgressWidth] = useState(0)
+  useLayoutEffect(() => {
+    setProgressWidth(status === 'ready' && progress ? (progressLabel.current?.offsetWidth ?? 0) : 0)
+  }, [status, progress])
+  const pageRight = unmoved ? unmoved.left + shift + unmoved.width : 0
+  const besidePage = unmoved !== null && unmoved.viewport - pageRight >= progressWidth + 32
 
   const openPanel = (next: Panel) => {
     setChromeShown(false)
@@ -1052,6 +1112,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
                 className="btn btn-ghost btn-square btn-sm shrink-0"
                 aria-label="Beginning of the book"
                 data-tooltip=""
+                aria-keyshortcuts="Home"
                 disabled={atBeginning}
                 onClick={() => goToFraction(0)}
               >
@@ -1102,6 +1163,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
                 className="btn btn-ghost btn-square btn-sm shrink-0"
                 aria-label="End of the book"
                 data-tooltip=""
+                aria-keyshortcuts="End"
                 disabled={atEnd}
                 onClick={() => goToFraction(1)}
               >
@@ -1149,11 +1211,12 @@ export function ReaderPage({ bookId }: { bookId: string }) {
           {/* The progress, in the corner of the page as a folio would be, and above the bottom
               bar while the bar is up. For reflowable text it sits in a strip of page colour as
               wide as the text, a bottom margin the text scrolls under rather than runs into; on
-              the pages of a fixed layout, in a small label at the page's corner. */}
+              the pages of a fixed layout, in a small label beside the page's corner, or in it. */}
           {progress && (
             <p
+              ref={progressLabel}
               aria-hidden
-              className={`pointer-events-none absolute z-10 bg-surface text-xs text-fg-muted tabular-nums transition-[bottom] duration-200 ease-out ${
+              className={`pointer-events-none absolute z-10 bg-surface text-xs whitespace-nowrap text-fg-muted tabular-nums transition-[bottom] duration-200 ease-out ${
                 fixedLayout || !unmoved ? 'rounded-sm px-1' : 'h-6 text-end leading-6'
               }`}
               style={{
@@ -1163,14 +1226,17 @@ export function ReaderPage({ bookId }: { bookId: string }) {
                       left: `calc(${unmoved.left + shift}px + env(safe-area-inset-left))`,
                       width: unmoved.width,
                     }
-                  : {
-                      right: `calc(${
-                        unmoved
-                          ? Math.max(4, unmoved.viewport - (unmoved.left + shift + unmoved.width))
-                          : 16
-                      }px + env(safe-area-inset-right))`,
-                      marginBottom: 4,
-                    }),
+                  : besidePage
+                    ? {
+                        left: `calc(${pageRight + 8}px + env(safe-area-inset-left))`,
+                        marginBottom: 4,
+                      }
+                    : {
+                        right: `calc(${
+                          unmoved ? Math.max(4, unmoved.viewport - pageRight) : 16
+                        }px + env(safe-area-inset-right))`,
+                        marginBottom: 4,
+                      }),
               }}
             >
               {progress}

@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Home and End go to the beginning and the end of the book.
+
 ### Changed
 
 - A new icon: a study carrel, a desk walled on three sides.
 - A new version is offered when you come back to the app, not only when it starts.
+- In a scrolled PDF or comic, Page Down and Page Up put the next or previous page at the top of
+  the window, as do the left and right arrow keys and taps on the sides of the page. Space goes
+  a screenful at a time, stopping at the edges of pages.
+- The progress of a PDF or comic sits beside the page rather than on it, where there is room.
 
 ### Fixed
 
@@ -22,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tapping a text field or a menu on a phone no longer zooms the page in.
 - Nothing sits under a phone's notch, Dynamic Island or home indicator.
 - Books can be added with Lockdown Mode on.
+- A page of a scrolled PDF or comic fitted under Whole page fills the window's height, where it
+  stopped a little short.
 
 ## [0.1.1] - 2026-10-27
 

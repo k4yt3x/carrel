@@ -74,6 +74,11 @@ declare module 'foliate-js/view.js' {
     getContents?(): { doc: Document; index: number }[]
     next(): Promise<void>
     prev(): Promise<void>
+    /**
+     * Shows a section. In a fixed layout a section is a page, which scrolled layout puts at the
+     * top of the window.
+     */
+    goTo(target: { index: number }): Promise<void>
   }
 
   /** An internal link was followed; cancelling the event keeps the view where it is. */

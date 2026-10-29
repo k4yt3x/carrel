@@ -174,6 +174,49 @@ test('fits a whole PDF page in a wide window when scrolling', async ({ page }) =
   expect((await firstPage())?.top).toBeGreaterThanOrEqual(0)
 })
 
+test('turns a scrolled PDF a page at a time, each page filling the window', async ({ page }) => {
+  await page.setViewportSize({ width: 1800, height: 600 })
+  await page.goto('/')
+  await addBooks(page, fixtures.pdf())
+  await openBook(page, 'A Portable Document')
+  /** Where a page's top is in the window, and how tall the page is. */
+  const pageAt = (index: number) =>
+    page.locator('foliate-view').evaluate((view, index) => {
+      const renderer = (view as unknown as { renderer: Element }).renderer
+      const box = renderer.shadowRoot
+        ?.querySelector(`.scroll-page[data-index="${index}"]`)
+        ?.getBoundingClientRect()
+      // + 0 makes -0 a plain 0.
+      return box ? { top: Math.round(box.top) + 0, height: Math.round(box.height) } : null
+    }, index)
+  const filling = { top: 0, height: 600 }
+  await expect.poll(() => pageAt(0)).toEqual(filling)
+  await page.keyboard.press('PageDown')
+  await expect.poll(() => pageAt(1)).toEqual(filling)
+  await page.keyboard.press(' ')
+  await expect.poll(() => pageAt(2)).toEqual(filling)
+  await page.keyboard.press('PageUp')
+  await expect.poll(() => pageAt(1)).toEqual(filling)
+  await page.keyboard.press('Home')
+  await expect.poll(() => pageAt(0)).toEqual(filling)
+  await page.keyboard.press('End')
+  await expect.poll(() => pageAt(2)).toEqual(filling)
+
+  // The progress sits beside the page's corner, just off the page.
+  const progress = page.locator('p[aria-hidden="true"]', { hasText: /^\d+%$/ })
+  const besidePage = async () => {
+    const right = await page.locator('foliate-view').evaluate((view) => {
+      const renderer = (view as unknown as { renderer: Element }).renderer
+      return renderer.shadowRoot
+        ?.querySelector('.scroll-page[data-index="2"]')
+        ?.getBoundingClientRect().right
+    })
+    const label = await progress.boundingBox()
+    return label && right !== undefined ? Math.round(label.x - right) : null
+  }
+  await expect.poll(besidePage).toBe(8)
+})
+
 test('shows a PDF page by page', async ({ page }) => {
   await page.goto('/')
   await addBooks(page, fixtures.pdf())
