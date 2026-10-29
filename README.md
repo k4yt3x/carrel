@@ -5,9 +5,7 @@ storage and never leave your device: no accounts, no servers, no tracking.
 
 Use it at [carrel.k4yt3x.com](https://carrel.k4yt3x.com), or host your own copy.
 
-<!--
-![Carrel's library and a book open in it](docs/screenshot.png)
--->
+![Carrel's library and a book open in it](assets/screenshot.webp)
 
 ## Features
 
