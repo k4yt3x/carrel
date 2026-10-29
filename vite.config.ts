@@ -119,7 +119,7 @@ export default defineConfig({
     viteStaticCopy({
       targets: [
         {
-          src: 'node_modules/pdfjs-dist/build/pdf.worker.min.mjs',
+          src: 'node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs',
           dest: 'vendor/pdfjs',
           rename: { stripBase: true },
         },
@@ -161,12 +161,16 @@ export default defineConfig({
     alias: {
       '@': resolve('./src'),
       // foliate-js imports pdf.js through this specifier; the module it names must be the
-      // same build as the worker copied above.
-      '@pdfjs': resolve('./node_modules/pdfjs-dist/build'),
+      // same build as the worker copied above. The legacy build brings its own polyfills for
+      // what the modern one takes for granted (Map.getOrInsertComputed, Math.sumPrecise and
+      // others only in Safari 26.2 and Chrome 147), so PDFs open from Safari 18 on.
+      '@pdfjs': resolve('./node_modules/pdfjs-dist/legacy/build'),
     },
   },
   build: {
     target: 'es2024',
+    // pdf.js's legacy build, about 510 kB, loads on its own when a PDF is opened.
+    chunkSizeWarningLimit: 600,
     license: { fileName: 'licenses.md' },
   },
   test: {

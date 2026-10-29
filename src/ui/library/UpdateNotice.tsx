@@ -19,11 +19,17 @@ export function UpdateNotice({ shown }: { shown: boolean }) {
   } = useRegisterSW({
     onRegisteredSW(_url, registration) {
       if (!registration) return
-      setInterval(() => {
+      const check = () => {
         registration.update().catch((error: unknown) => {
           console.warn('could not check for a new version', error)
         })
-      }, checkEveryMs)
+      }
+      setInterval(check, checkEveryMs)
+      // An app on a phone's Home Screen is paused when left rather than closed, and its timers
+      // with it, so it may go days without opening afresh; coming back to it checks too.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') check()
+      })
     },
     onRegisterError(error: unknown) {
       console.error('could not register the service worker', error)

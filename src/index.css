@@ -112,3 +112,16 @@
     }
   }
 }
+
+/*
+ * iOS zooms the page into a form field set smaller than 16px when it takes the focus, and leaves
+ * it zoomed. On touch screens the fields are 16px. Outside any layer, so it outranks the sizes
+ * the components and utilities give them.
+ */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

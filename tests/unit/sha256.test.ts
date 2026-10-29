@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sha256 } from '@/domain/sha256'
 
 describe('sha256', () => {
@@ -22,5 +22,20 @@ describe('sha256', () => {
     ]
     const expected = createHash('sha256').update(bytes).digest('hex')
     expect(await sha256(new Blob(parts))).toBe(expected)
+  })
+
+  describe('without WebAssembly, as in Lockdown Mode', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    })
+
+    it('gives the same digest', async () => {
+      vi.stubGlobal('WebAssembly', undefined)
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const bytes = new Uint8Array(70_000).map((_, i) => (i * 7) & 0xff)
+      const expected = createHash('sha256').update(bytes).digest('hex')
+      expect(await sha256(new Blob([bytes]))).toBe(expected)
+    })
   })
 })

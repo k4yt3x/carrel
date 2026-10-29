@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - A new icon: a study carrel, a desk walled on three sides.
+- A new version is offered when you come back to the app, not only when it starts.
+
+### Fixed
+
+- On iPhone and iPad, MOBI, AZW3, FB2 and CBZ books can be chosen in the file picker.
+- Saving a backup or a book from Carrel on the Home Screen of an iPhone or iPad opens the share
+  sheet, where Save to Files is, instead of a preview with no way back. A backup that takes a
+  while to make asks for a second tap.
+- PDFs open in older browsers too, from Safari 18 on.
+- Tapping a text field or a menu on a phone no longer zooms the page in.
+- Nothing sits under a phone's notch, Dynamic Island or home indicator.
+- Books can be added with Lockdown Mode on.
 
 ## [0.1.1] - 2026-10-27
 

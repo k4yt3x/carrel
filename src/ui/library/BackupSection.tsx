@@ -17,12 +17,13 @@ import { db } from '@/domain/db'
 import { isQuotaError, requestPersistentStorage, storageFullMessage } from '@/domain/library'
 import { currentPreferences, normalizePreferences, useAppSettings } from '@/store/appSettings'
 import { Switch } from '@/ui/controls'
-import { downloadFile, pickSaveTarget } from '@/ui/download'
+import { pickSaveTarget, saveFile } from '@/ui/download'
 import { formatBytes } from '@/ui/format'
 
 type State =
   | { name: 'idle' }
   | { name: 'exporting'; done: number; total: number }
+  | { name: 'saving'; file: File }
   | { name: 'exported' }
   | { name: 'checking' }
   | { name: 'confirming'; file: File; summary: BackupSummary }
@@ -96,8 +97,19 @@ export function BackupSection() {
         preferences: currentPreferences(),
         onProgress: (done, total) => setState({ name: 'exporting', done, total }),
       })
-      if (blob) downloadFile(blob, name)
-      setState({ name: 'exported' })
+      if (blob) await save(new File([blob], name, { type: 'application/zip' }))
+      else setState({ name: 'exported' })
+    } catch (error) {
+      setState({ name: 'failed', message: failure(error, 'export') })
+    }
+  }
+
+  // Making a backup can outlast the few seconds after a tap in which the share sheet opens;
+  // the backup then waits for a tap of its own, as it does when the sheet is dismissed.
+  const save = async (file: File) => {
+    try {
+      const result = await saveFile(file, file.name)
+      setState(result === 'saved' ? { name: 'exported' } : { name: 'saving', file })
     } catch (error) {
       setState({ name: 'failed', message: failure(error, 'export') })
     }
@@ -168,6 +180,15 @@ export function BackupSection() {
           }}
         />
       </div>
+
+      {state.name === 'saving' && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-sunken p-4">
+          <p className="flex-1 text-sm leading-normal text-fg">Your backup is ready.</p>
+          <button type="button" className="btn btn-primary" onClick={() => save(state.file)}>
+            Save backup…
+          </button>
+        </div>
+      )}
 
       {state.name === 'confirming' && (
         <div className="space-y-4 rounded-lg bg-surface-sunken p-4">

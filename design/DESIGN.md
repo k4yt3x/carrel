@@ -70,7 +70,8 @@ JSON's `$meta.generated`.
 
 - **Type scale:** 12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72 px. These are the only sizes.
   Interface text is 14 px; secondary details 12 px; dialog titles 18 px; the empty-state
-  heading 20 px; the wordmark 24 px.
+  heading 20 px; the wordmark 24 px. On touch screens form fields are 16 px, since iOS zooms
+  the page into a smaller field that takes the focus.
 - **Typefaces:** the interface is set in each platform's own interface font (San Francisco,
   Segoe UI, Noto Sans), named one by one rather than through `system-ui`. `system-ui` is the
   font the desktop is set to, which on Linux can be anything, a monospace face included, and
@@ -93,6 +94,11 @@ value outside this list has to be written as an arbitrary value, where review se
 **Space around a group is always larger than space inside it.** A cover is 12 px from its
 title and 48 px from the row below; a dialog's title is 12 px from its text and 32 px from its
 buttons.
+
+**The system's edges come first.** On a phone, the notch or Dynamic Island, the status bar and
+the home indicator take the edges of the screen (`env(safe-area-inset-*)`). Content and
+controls keep inside them, with their usual margins on top; the backgrounds of bars, sheets
+and the docked contents run on into them.
 
 ## Depth
 

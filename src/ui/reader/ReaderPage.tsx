@@ -423,7 +423,13 @@ export function ReaderPage({ bookId }: { bookId: string }) {
       }
       const extent = view ? textExtent(view) : null
       const viewport = host.current?.clientWidth ?? window.innerWidth
-      const next = extent && { ...extent, left: extent.left - appliedShift.current, viewport }
+      // From the book's own left edge, which a notch beside it moves in from the window's.
+      const origin = host.current?.getBoundingClientRect().left ?? 0
+      const next = extent && {
+        ...extent,
+        left: extent.left - origin - appliedShift.current,
+        viewport,
+      }
       setUnmoved((current) =>
         current?.left === next?.left &&
         current?.width === next?.width &&
@@ -849,7 +855,12 @@ export function ReaderPage({ bookId }: { bookId: string }) {
     change.catch((error: unknown) => console.error('could not change full screen', error))
   }
 
-  const bar = `absolute inset-x-0 z-20 bg-surface-raised shadow-md transition duration-200 ease-out`
+  const bar = `absolute inset-x-0 z-20 bg-surface-raised pr-[env(safe-area-inset-right)] shadow-md transition duration-200 ease-out`
+  // The bars run under the system's edges (a notch, the home indicator) and keep their controls
+  // out of them; beside the docked contents, which reach the window's edge, they start after.
+  const barEdge = barStart
+    ? { insetInlineStart: `calc(${barStart}px + env(safe-area-inset-left))` }
+    : { paddingInlineStart: 'env(safe-area-inset-left)' }
   // While the pointer rests on the bars or focus is inside them, they stay up.
   const holdChrome = {
     onPointerEnter: () => {
@@ -878,13 +889,20 @@ export function ReaderPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-surface text-fg">
-      {/* The book always has the whole window, so panels opening beside it don't move it. */}
-      <div ref={host} className="absolute inset-0" />
+      {/* The book always has the whole window, so panels opening beside it don't move it: all
+          of it but the edges the system draws over (a notch, the home indicator), where the
+          bars' backgrounds run but no text goes. */}
+      <div
+        ref={host}
+        className="absolute top-[env(safe-area-inset-top)] right-[env(safe-area-inset-right)] bottom-[env(safe-area-inset-bottom)] left-[env(safe-area-inset-left)]"
+      />
       {guide && unmoved && (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-y-0 z-10 border-s border-dashed border-fg-muted"
-          style={{ left: unmoved.left + shift + unmoved.width / 2 }}
+          style={{
+            left: `calc(${unmoved.left + shift + unmoved.width / 2}px + env(safe-area-inset-left))`,
+          }}
         />
       )}
 
@@ -893,7 +911,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
           {/* Where the bar's Back button will be, for a book that is slow to open. */}
           <a
             href={libraryHref}
-            className={`${iconButton} absolute start-2 top-[calc(4px+env(safe-area-inset-top))] sm:start-4`}
+            className={`${iconButton} absolute start-[calc(8px+env(safe-area-inset-left))] top-[calc(4px+env(safe-area-inset-top))] sm:start-[calc(16px+env(safe-area-inset-left))]`}
             aria-label="Back to library"
             data-tooltip=""
           >
@@ -931,7 +949,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
         <>
           <header
             {...holdChrome}
-            style={barStart ? { insetInlineStart: barStart } : undefined}
+            style={barEdge}
             className={`${bar} top-0 pt-[env(safe-area-inset-top)] ${
               chromeShown
                 ? 'translate-y-0 opacity-100'
@@ -1019,7 +1037,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
 
           <footer
             {...holdChrome}
-            style={barStart ? { insetInlineStart: barStart } : undefined}
+            style={barEdge}
             className={`${bar} bottom-0 pb-[env(safe-area-inset-bottom)] ${
               chromeShown
                 ? 'translate-y-0 opacity-100'
@@ -1141,11 +1159,16 @@ export function ReaderPage({ bookId }: { bookId: string }) {
               style={{
                 bottom: `calc(${chromeShown ? 44 : 0}px + env(safe-area-inset-bottom))`,
                 ...(unmoved && !fixedLayout
-                  ? { left: unmoved.left + shift, width: unmoved.width }
+                  ? {
+                      left: `calc(${unmoved.left + shift}px + env(safe-area-inset-left))`,
+                      width: unmoved.width,
+                    }
                   : {
-                      right: unmoved
-                        ? Math.max(4, unmoved.viewport - (unmoved.left + shift + unmoved.width))
-                        : 16,
+                      right: `calc(${
+                        unmoved
+                          ? Math.max(4, unmoved.viewport - (unmoved.left + shift + unmoved.width))
+                          : 16
+                      }px + env(safe-area-inset-right))`,
                       marginBottom: 4,
                     }),
               }}

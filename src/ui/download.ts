@@ -1,5 +1,29 @@
-/** Hands a file to the browser to save, as a download. */
-export function downloadFile(file: Blob, name: string): void {
+import { isHomeScreenApp } from '@/ui/platform'
+
+/**
+ * What became of a file handed over to be saved: 'retry' when the share sheet would not open
+ * because the tap that asked for it was too long ago, and the reader has to tap again.
+ */
+export type SaveResult = 'saved' | 'cancelled' | 'retry'
+
+/**
+ * Hands a file to the reader to keep. In a browser that is a download. In an app opened from
+ * the Home Screen of an iPhone or iPad, a download opens a preview that there is no way back
+ * from (WebKit bug 236943), so the file goes to the share sheet instead, which has Save to
+ * Files. The share sheet opens only within a few seconds of a tap.
+ */
+export async function saveFile(file: Blob, name: string): Promise<SaveResult> {
+  const shared = new File([file], name, { type: file.type })
+  if (isHomeScreenApp() && navigator.canShare?.({ files: [shared] })) {
+    try {
+      await navigator.share({ files: [shared] })
+      return 'saved'
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled'
+      if (error instanceof DOMException && error.name === 'NotAllowedError') return 'retry'
+      throw error
+    }
+  }
   const url = URL.createObjectURL(file)
   const link = document.createElement('a')
   link.href = url
@@ -8,6 +32,7 @@ export function downloadFile(file: Blob, name: string): void {
   // The download has taken its own reference by the time the click returns in every current
   // browser; the delay covers ones that start it a moment later.
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  return 'saved'
 }
 
 interface SaveFilePickerOptions {

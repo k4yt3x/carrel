@@ -326,8 +326,9 @@ function TocSidebar({
     <aside
       data-toc
       aria-labelledby={titleId}
-      className="absolute inset-y-0 start-0 z-20 flex flex-col border-e border-border bg-surface-raised text-fg"
-      style={{ width }}
+      className="absolute inset-y-0 start-0 z-20 flex flex-col border-e border-border bg-surface-raised pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-fg"
+      // The width is the list's own; the panel runs on under a notch beside it, as the bars do.
+      style={{ width: `calc(${width}px + env(safe-area-inset-left))` }}
       onKeyDown={(event) => {
         if (event.key !== 'Escape' || event.ctrlKey || event.metaKey || event.altKey) return
         event.preventDefault()

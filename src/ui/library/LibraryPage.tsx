@@ -32,12 +32,13 @@ import { useImports } from '@/store/imports'
 import { useLibraryView } from '@/store/libraryView'
 import { BookDetailsDialog } from '@/ui/BookDetails'
 import { ConfirmDialog } from '@/ui/ConfirmDialog'
-import { downloadFile } from '@/ui/download'
+import { saveFile } from '@/ui/download'
 import { BookCard, BookRow, listColumns } from '@/ui/library/BookCard'
 import { DropOverlay } from '@/ui/library/DropOverlay'
 import { EmptyLibrary } from '@/ui/library/EmptyLibrary'
 import { LibrarySettings } from '@/ui/library/LibrarySettings'
 import { toggleSelection } from '@/ui/library/selection'
+import { pickerAccept } from '@/ui/platform'
 
 const sortLabels: Record<SortOrder, string> = {
   recent: 'Recently read',
@@ -125,7 +126,8 @@ export function LibraryPage() {
     try {
       const file = await loadBookFile(book.id)
       if (!file) throw new Error(`no file stored for ${book.id}`)
-      downloadFile(file, file.name)
+      // Too slow for the share sheet, which a second tap opens.
+      if ((await saveFile(file, file.name)) === 'retry') setDownloadFailed(book.title)
     } catch (error) {
       console.error('could not download the book', error)
       setDownloadFailed(book.title)
@@ -193,8 +195,9 @@ export function LibraryPage() {
 
   return (
     // A column the height of the window, so the empty library's welcome can sit in the middle of
-    // the space under the header.
-    <div className="flex min-h-dvh flex-col bg-surface">
+    // the space under the header; inside the edges the system draws over (a notch, the home
+    // indicator).
+    <div className="flex min-h-dvh flex-col bg-surface pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
       <header className="mx-auto w-full max-w-7xl px-4 pt-6 pb-8 sm:px-8 sm:pt-8">
         {selecting ? (
           <div className="flex items-center gap-3 sm:gap-6">
@@ -409,7 +412,7 @@ export function LibraryPage() {
         {downloadFailed && (
           <p
             role="alert"
-            className="fixed inset-x-4 bottom-6 z-60 mx-auto max-w-sm rounded-lg bg-danger-subtle px-4 py-3 text-center text-sm text-danger-fg shadow-lg"
+            className="fixed inset-x-4 bottom-[calc(24px+env(safe-area-inset-bottom))] z-60 mx-auto max-w-sm rounded-lg bg-danger-subtle px-4 py-3 text-center text-sm text-danger-fg shadow-lg"
           >
             “{downloadFailed}” couldn’t be downloaded. Try again.
           </p>
@@ -421,7 +424,7 @@ export function LibraryPage() {
         type="file"
         multiple
         hidden
-        accept={bookExtensions.join(',')}
+        accept={pickerAccept(bookExtensions)}
         onChange={(event) => {
           addFiles([...(event.target.files ?? [])])
           event.target.value = ''

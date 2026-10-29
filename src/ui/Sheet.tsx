@@ -27,7 +27,13 @@ export function Sheet({ open, title, side, seeThrough, onOpened, onClose, childr
   const backdrop = useBackdropDismiss(onClose)
   const titleId = useId()
 
-  const edge = side === 'start' ? 'sm:start-0 sm:end-auto' : 'sm:end-0 sm:start-auto'
+  // On wide screens the sheet runs the window's height and keeps its controls out of the
+  // system's edges (a notch, the status bar); rising from the bottom, it clears the home
+  // indicator.
+  const edge =
+    side === 'start'
+      ? 'sm:start-0 sm:end-auto sm:pl-[env(safe-area-inset-left)]'
+      : 'sm:end-0 sm:start-auto sm:pr-[env(safe-area-inset-right)]'
   return (
     <dialog
       ref={ref}
@@ -36,7 +42,7 @@ export function Sheet({ open, title, side, seeThrough, onOpened, onClose, childr
         if (dismissed(event)) onClose()
       }}
       {...backdrop}
-      className={`fixed inset-x-0 top-auto bottom-0 m-0 max-h-[75dvh] w-full max-w-none rounded-t-lg bg-surface-raised p-0 text-fg shadow-2xl sm:inset-y-0 sm:h-full sm:max-h-none sm:w-96 sm:rounded-none ${edge} ${
+      className={`fixed inset-x-0 top-auto bottom-0 m-0 max-h-[75dvh] w-full max-w-none rounded-t-lg bg-surface-raised p-0 text-fg shadow-2xl sm:inset-y-0 sm:h-full sm:max-h-none sm:w-96 sm:rounded-none sm:pt-[env(safe-area-inset-top)] ${edge} ${
         seeThrough ? 'backdrop:bg-transparent' : 'backdrop:bg-scrim/40'
       }`}
     >
@@ -60,7 +66,9 @@ export function Sheet({ open, title, side, seeThrough, onOpened, onClose, childr
             <X aria-hidden className="size-6" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto pb-8">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto pb-[calc(32px+env(safe-area-inset-bottom))]">
+          {children}
+        </div>
       </div>
     </dialog>
   )

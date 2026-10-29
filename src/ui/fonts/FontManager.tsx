@@ -24,8 +24,9 @@ import { ConfirmDialog } from '@/ui/ConfirmDialog'
 import { InfoTip } from '@/ui/InfoTip'
 import { Menu } from '@/ui/Menu'
 import { Modal } from '@/ui/Modal'
+import { pickerAccept } from '@/ui/platform'
 
-const fontExtensions = '.ttf,.otf,.woff,.woff2'
+const fontExtensions = ['.ttf', '.otf', '.woff', '.woff2']
 
 type Work =
   | { name: 'idle' }
@@ -215,7 +216,7 @@ export function FontManager() {
         <input
           ref={picker}
           type="file"
-          accept={fontExtensions}
+          accept={pickerAccept(fontExtensions)}
           multiple
           hidden
           onChange={(event) => {

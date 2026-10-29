@@ -8,7 +8,16 @@ import { createSHA256 } from 'hash-wasm'
  * digest() cannot do either: it takes the whole buffer at once.
  */
 export async function sha256(blob: Blob): Promise<string> {
-  const hasher = await createSHA256()
+  let hasher: Awaited<ReturnType<typeof createSHA256>>
+  try {
+    hasher = await createSHA256()
+  } catch (error) {
+    // Lockdown Mode on iPhone, iPad and Mac turns WebAssembly off. WebCrypto gives the same
+    // digest, of the whole file at once.
+    console.warn('hashing without WebAssembly', error)
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))
+    return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  }
   hasher.init()
   const reader = blob.stream().getReader()
   for (;;) {

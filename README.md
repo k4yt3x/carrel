@@ -1,4 +1,4 @@
-# Carrel
+# Carrel 📖
 
 An e-book reader that runs entirely in your browser. Add EPUB, MOBI, AZW3, FB2, CBZ and PDF
 files to your library and read them; they are kept in the browser's own storage and never
@@ -29,6 +29,16 @@ can't phone home either.
 Browsers may clear a site's storage when space runs short, and Safari clears it for sites you
 haven't visited in a while. Carrel asks the browser to keep its storage; back up the library
 from Settings, or keep the original files of books you care about.
+
+## On iPhone and iPad
+
+In Safari, choose Share, then Add to Home Screen, and open Carrel from there. It works offline,
+and Safari's clearing of sites you haven't visited in a while doesn't apply to it. It needs
+iOS 18 or later.
+
+The app keeps a library of its own: books added in a Safari tab don't appear in it. To move a
+library over, back it up in Safari and restore the backup in the app. Removing the app from the
+Home Screen deletes its library.
 
 ## Development
 

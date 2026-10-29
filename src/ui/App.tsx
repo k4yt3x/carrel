@@ -27,8 +27,9 @@ export function App() {
         <LibraryPage />
       )}
       <Tooltips />
-      {/* Notices stack in a corner of the library, so two at once don't cover each other. */}
-      <div className="fixed inset-x-4 bottom-4 z-60 flex flex-col gap-3 sm:start-auto sm:end-8 sm:bottom-8 sm:w-96">
+      {/* Notices stack in a corner of the library, so two at once don't cover each other, and
+          clear of the system's edges: a notch beside them, the home indicator below. */}
+      <div className="fixed right-[calc(16px+env(safe-area-inset-right))] bottom-[calc(16px+env(safe-area-inset-bottom))] left-[calc(16px+env(safe-area-inset-left))] z-60 flex flex-col gap-3 sm:right-[calc(32px+env(safe-area-inset-right))] sm:bottom-[calc(32px+env(safe-area-inset-bottom))] sm:left-auto sm:w-96">
         <UpdateNotice shown={route.name === 'library'} />
         {route.name === 'library' && <ImportNotice />}
       </div>
