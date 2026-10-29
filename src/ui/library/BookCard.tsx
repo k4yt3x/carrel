@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react'
 import { type MouseEvent, memo, type ReactNode } from 'react'
 import type { Book } from '@/domain/db'
+import type { BookFormat } from '@/domain/formats'
 import { readerHref } from '@/domain/routes'
 import { formatDay } from '@/ui/format'
 import { BookMenu } from '@/ui/library/BookMenu'
@@ -88,6 +89,16 @@ interface BookItemProps {
   onDetails(book: Book): void
   onDownload(book: Book): void
   onRemove(book: Book): void
+}
+
+/** The book's format, as a tag like those naming the formats on the welcome screen. */
+function FormatTag({ format }: { format: BookFormat | null }) {
+  if (!format) return null
+  return (
+    <span className="shrink-0 rounded-sm bg-surface-sunken px-1 text-xs tracking-wide text-fg-secondary">
+      {format}
+    </span>
+  )
 }
 
 /** The round mark of a chosen book, where the book's menu sits while not choosing. */
@@ -203,7 +214,10 @@ export const BookCard = memo(function BookCard(props: BookItemProps) {
   const { book, fraction, selecting, selected } = props
   const foot = (
     <div className="mt-auto flex h-8 items-center justify-between">
-      <span className="text-xs text-fg-muted">{progressLabel(fraction)}</span>
+      <div className="flex items-center gap-2">
+        <FormatTag format={book.format} />
+        <span className="text-xs text-fg-muted">{progressLabel(fraction)}</span>
+      </div>
       <div className="-me-2">
         <ItemEnd {...props} />
       </div>
@@ -242,17 +256,18 @@ export const BookCard = memo(function BookCard(props: BookItemProps) {
 
 /**
  * The columns of the list, shared by its heading and its rows: the cover, the title, then on
- * wider screens the author in a column of its own, on the widest the days the book was last
- * read and added, and the progress; the last column holds the book's menu. While choosing,
- * the menu's column goes and a column for the mark leads the row instead, and the rows (and
- * their heading) are inset, so a chosen row's tint has room around what it holds. Each row
- * lays its cells on these columns through a subgrid, so the columns line up down the list.
+ * wider screens the author and the format in columns of their own, on the widest the days the
+ * book was last read and added, and the progress; the last column holds the book's menu.
+ * While choosing, the menu's column goes and a column for the mark leads the row instead, and
+ * the rows (and their heading) are inset, so a chosen row's tint has room around what it
+ * holds. Each row lays its cells on these columns through a subgrid, so the columns line up
+ * down the list.
  */
 export function listColumns(selecting: boolean): string {
   // Whole class names, for Tailwind to find.
   return selecting
-    ? 'grid gap-x-4 grid-cols-[var(--spacing-8)_var(--spacing-12)_minmax(0,1fr)_var(--spacing-16)] md:grid-cols-[var(--spacing-8)_var(--spacing-12)_minmax(0,3fr)_minmax(0,2fr)_var(--spacing-24)] lg:grid-cols-[var(--spacing-8)_var(--spacing-12)_minmax(0,3fr)_minmax(0,2fr)_var(--spacing-32)_var(--spacing-32)_var(--spacing-24)]'
-    : 'grid gap-x-4 grid-cols-[var(--spacing-12)_minmax(0,1fr)_var(--spacing-16)_var(--spacing-8)] md:grid-cols-[var(--spacing-12)_minmax(0,3fr)_minmax(0,2fr)_var(--spacing-24)_var(--spacing-8)] lg:grid-cols-[var(--spacing-12)_minmax(0,3fr)_minmax(0,2fr)_var(--spacing-32)_var(--spacing-32)_var(--spacing-24)_var(--spacing-8)]'
+    ? 'grid gap-x-4 grid-cols-[var(--spacing-8)_var(--spacing-12)_minmax(0,1fr)_var(--spacing-16)] md:grid-cols-[var(--spacing-8)_var(--spacing-12)_minmax(0,3fr)_minmax(0,2fr)_var(--spacing-16)_var(--spacing-24)] lg:grid-cols-[var(--spacing-8)_var(--spacing-12)_minmax(0,3fr)_minmax(0,2fr)_var(--spacing-16)_var(--spacing-32)_var(--spacing-32)_var(--spacing-24)]'
+    : 'grid gap-x-4 grid-cols-[var(--spacing-12)_minmax(0,1fr)_var(--spacing-16)_var(--spacing-8)] md:grid-cols-[var(--spacing-12)_minmax(0,3fr)_minmax(0,2fr)_var(--spacing-16)_var(--spacing-24)_var(--spacing-8)] lg:grid-cols-[var(--spacing-12)_minmax(0,3fr)_minmax(0,2fr)_var(--spacing-16)_var(--spacing-32)_var(--spacing-32)_var(--spacing-24)_var(--spacing-8)]'
 }
 
 /**
@@ -288,11 +303,17 @@ export const BookRow = memo(function BookRow(props: BookItemProps) {
           <p className="truncate text-sm font-semibold text-fg group-hover:text-action-fg">
             {book.title}
           </p>
-          {authors && (
-            <p className="mt-1 truncate text-sm text-fg-secondary md:hidden">{authors}</p>
+          {(authors || book.format) && (
+            <p className="mt-1 flex items-center gap-2 text-sm text-fg-secondary md:hidden">
+              <FormatTag format={book.format} />
+              <span className="truncate">{authors}</span>
+            </p>
           )}
         </div>
         <p className="hidden truncate text-sm text-fg-secondary md:block">{authors}</p>
+        <span className="hidden md:flex">
+          <FormatTag format={book.format} />
+        </span>
         <span className="hidden text-sm text-fg-secondary lg:block">
           {book.openedAt === null ? '' : formatDay(book.openedAt)}
         </span>

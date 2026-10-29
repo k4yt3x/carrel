@@ -31,7 +31,7 @@ test('takes books dropped on the page, and puts the drop target away when a drag
 }) => {
   const drag = await page.evaluateHandle(() => {
     const transfer = new DataTransfer()
-    transfer.items.add(new File(['Just some notes.'], 'notes.txt', { type: 'text/plain' }))
+    transfer.items.add(new File(['Just some notes.'], 'notes.md', { type: 'text/markdown' }))
     return transfer
   })
   const target = page.getByText('Drop to add to your library')
@@ -43,7 +43,7 @@ test('takes books dropped on the page, and puts the drop target away when a drag
   await page.dispatchEvent('body', 'dragenter', { dataTransfer: drag })
   await page.dispatchEvent('body', 'drop', { dataTransfer: drag })
   await expect(target).toBeHidden()
-  await expect(page.getByRole('alert')).toContainText('“notes.txt” couldn’t be added.')
+  await expect(page.getByRole('alert')).toContainText('“notes.md” couldn’t be added.')
 })
 
 test('adds a book with its title, author and cover', async ({ page }) => {
@@ -53,6 +53,23 @@ test('adds a book with its title, author and cover', async ({ page }) => {
   await expect(card).toContainText('Ada Lovelace')
   await expect(card).not.toContainText('%')
   await expect(card.locator('img')).toHaveJSProperty('complete', true)
+})
+
+test('labels each book with its format, on its cover and in the list', async ({ page }) => {
+  await addBooks(page, fixtures.epub(), fixtures.pdf(), fixtures.plainText())
+  await expect(page.getByRole('status')).toContainText('Added 3 books.')
+  const formats = {
+    'The Test Book': 'EPUB',
+    'A Portable Document': 'PDF',
+    'A Plain Text Book': 'TXT',
+  }
+  for (const [title, format] of Object.entries(formats)) {
+    await expect(page.getByRole('listitem').filter({ hasText: title })).toContainText(format)
+  }
+  await page.getByRole('radio', { name: 'List' }).check({ force: true })
+  for (const [title, format] of Object.entries(formats)) {
+    await expect(page.getByRole('listitem').filter({ hasText: title })).toContainText(format)
+  }
 })
 
 test('reads a PDF’s title and author', async ({ page }) => {
@@ -72,9 +89,9 @@ test('says when a book is already in the library', async ({ page }) => {
 })
 
 test('explains why a file that is not a book was not added', async ({ page }) => {
-  await addBooks(page, fixtures.text())
+  await addBooks(page, fixtures.notes())
   const alert = page.getByRole('alert')
-  await expect(alert).toContainText('“notes.txt” couldn’t be added.')
+  await expect(alert).toContainText('“notes.md” couldn’t be added.')
   await expect(alert).toContainText('It isn’t in a format Carrel reads')
 })
 

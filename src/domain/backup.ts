@@ -32,6 +32,7 @@ import {
   type Progress,
 } from '@/domain/db'
 import { detectFontFormat, fontFileLimit, fontNamed } from '@/domain/fonts'
+import { formatOf } from '@/domain/formats'
 import { normalizeReadingSettings, type ReadingSettings } from '@/domain/settings'
 import { sha256 } from '@/domain/sha256'
 
@@ -69,7 +70,8 @@ type BackupCover =
 
 const noCover: BackupCover = { cover: null, coverType: null, coverWidth: null, coverHeight: null }
 
-type BackupBook = Book & {
+// A book's format is not kept: it follows from the file's name and type, as on import.
+type BackupBook = Omit<Book, 'format'> & {
   fileName: string
   fileType: string
   /** Where the book's file is in the zip; null in a backup made without the books. */
@@ -367,7 +369,15 @@ async function restoreBook(
   const cover = await readCover(book, entries)
   try {
     await db.transaction('rw', db.books, db.files, db.covers, async () => {
-      await db.books.add({ id, title, authors, language, addedAt, openedAt })
+      await db.books.add({
+        id,
+        title,
+        authors,
+        language,
+        format: formatOf(file),
+        addedAt,
+        openedAt,
+      })
       await db.files.add({ id, file })
       if (cover) await db.covers.add(cover)
     })

@@ -9,7 +9,7 @@ Use it at [carrel.k4yt3x.com](https://carrel.k4yt3x.com), or host your own copy.
 
 ## Features
 
-- **Formats:** EPUB, MOBI, AZW3, FB2, CBZ and PDF
+- **Formats:** EPUB, MOBI, AZW3, FB2, CBZ, PDF and plain text (TXT)
 - **Library:** a grid of covers or a list; search, sort, and remove books in bulk
 - **Reading:** paged or scrolled, one or two columns, full screen; search within a book,
   footnotes in a popup, a table of contents in a sidebar

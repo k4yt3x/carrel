@@ -17,6 +17,7 @@ async function addBook(content: string, title: string, { cover = true } = {}): P
     title,
     authors: ['An Author'],
     language: 'en',
+    format: 'EPUB',
     addedAt: 1_000,
     openedAt: 2_000,
   })

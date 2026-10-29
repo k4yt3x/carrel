@@ -38,7 +38,7 @@ describe('importFiles', () => {
     expect(outcome.added).toHaveLength(1)
     const id = outcome.added[0]?.id ?? ''
     expect(id).toMatch(/^[0-9a-f]{64}$/)
-    expect(await db.books.get(id)).toMatchObject({ title: 'Alpha', openedAt: null })
+    expect(await db.books.get(id)).toMatchObject({ title: 'Alpha', format: 'EPUB', openedAt: null })
     const stored = await db.files.get(id)
     expect(stored?.file.name).toBe('book.epub')
     expect(await stored?.file.text()).toBe('alpha')

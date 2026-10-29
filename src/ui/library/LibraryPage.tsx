@@ -5,7 +5,8 @@
  * Content, by rank:
  *   primary    the books themselves: cover, then title
  *   secondary  author, reading progress
- *   tertiary   search, sort, the per-book menu
+ *   tertiary   the book's format, a quiet tag like the welcome screen's; search, sort, the
+ *              per-book menu
  * Actions: one primary, "Add books" (in the empty state it is the page's only action, so
  *   the header copy is hidden there); search, sort and the covers/list switch are secondary;
  *   downloading and removing a book are tertiary and sit behind each book's menu; settings
@@ -378,7 +379,7 @@ export function LibraryPage() {
           </div>
         )}
         {shown.length > 0 && layout === 'list' && (
-          // Narrow screens show each book's author under its title, with no headings.
+          // Narrow screens show each book's format and author under its title, with no headings.
           <fieldset
             className={`${listColumns(selecting)} hidden items-center border-b border-border pb-3 md:grid ${
               selecting ? 'px-3' : ''
@@ -389,6 +390,9 @@ export function LibraryPage() {
             <span className={selecting ? 'col-span-2' : ''} />
             <SortHeading order="title" label="Title" sort={sort} onSort={setSort} />
             <SortHeading order="author" label="Author" sort={sort} onSort={setSort} />
+            <span className="text-xs font-semibold tracking-wide text-fg-muted uppercase">
+              Format
+            </span>
             <SortHeading
               order="recent"
               label="Last read"

@@ -275,9 +275,33 @@ export const fixtures = {
       css: 'p { font-size: 12pt; } h1 { font-size: medium; }',
     }),
   }),
-  text: (): FixtureFile => ({
-    name: 'notes.txt',
-    mimeType: 'text/plain',
+  /** A file that is neither a book nor a font. */
+  notes: (): FixtureFile => ({
+    name: 'notes.md',
+    mimeType: 'text/markdown',
     buffer: Buffer.from('Just some notes, not a book.'),
+  }),
+  /** A book in plain text, a paragraph to a line, in Latin-1 rather than UTF-8. */
+  plainText: (): FixtureFile => ({
+    name: 'A Plain Text Book.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
+      ['A Plain Text Book', 'Chapter 1: The Room', 'Chapter 2: The Lamp', 'Chapter 3: The Desk']
+        .flatMap((line, chapter) =>
+          chapter === 0
+            ? [line, '']
+            : [
+                line,
+                ...Array.from(
+                  { length: 30 },
+                  (_, n) =>
+                    `Paragraph ${n + 1} of chapter ${chapter}. The reading room was quiet except for the turning of pages, and the lamp at each carrel threw a small circle of light onto the desk below it, where the books lay open, à l'étude.`,
+                ),
+                '',
+              ],
+        )
+        .join('\r\n'),
+      'latin1',
+    ),
   }),
 }

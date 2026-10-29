@@ -2,6 +2,7 @@ import Dexie from 'dexie'
 import { makeThumbnail, type Thumbnail } from '@/domain/cover'
 import { type Book, db, type Progress } from '@/domain/db'
 import { type Book as FoliateBook, loadFoliate, openBook } from '@/domain/foliate'
+import { bookFormatNames, formatOf } from '@/domain/formats'
 import { type BookMetadata, readMetadata, type TextRun, titleFromTextRuns } from '@/domain/metadata'
 import { sha256 } from '@/domain/sha256'
 
@@ -47,6 +48,8 @@ async function titleFromFirstPage(book: FoliateBook): Promise<string | null> {
   }
 }
 
+const formatList = new Intl.ListFormat('en-GB', { type: 'disjunction' }).format(bookFormatNames)
+
 /** Reads a book's metadata and cover. Throws ImportError when the file is not a book. */
 export async function inspectBook(file: File): Promise<Inspection> {
   const { NotFoundError, UnsupportedTypeError } = await loadFoliate()
@@ -55,7 +58,7 @@ export async function inspectBook(file: File): Promise<Inspection> {
     book = await openBook(file)
   } catch (error) {
     if (error instanceof UnsupportedTypeError) {
-      throw new ImportError('It isn’t in a format Carrel reads: EPUB, MOBI, AZW3, FB2, CBZ or PDF.')
+      throw new ImportError(`It isn’t in a format Carrel reads: ${formatList}.`)
     }
     if (error instanceof NotFoundError) throw new ImportError('The file is empty.')
     console.error(`could not parse ${file.name}`, error)
@@ -128,6 +131,7 @@ async function importFile(
     title: clip(title),
     authors: authors.slice(0, authorLimit).map(clip),
     language,
+    format: formatOf(file),
     addedAt: Date.now(),
     openedAt: null,
   }

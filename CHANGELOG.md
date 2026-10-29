@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Plain-text (TXT) books, in any common encoding, divided into chapters at their headings.
+- Each book in the library is labelled with its format: EPUB, PDF, TXT and so on.
+
 ## [0.2.0] - 2026-10-29
 
 ### Added
@@ -18,30 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A new icon: a study carrel, a desk walled on three sides.
 - A new version is offered when you come back to the app, not only when it starts.
-- In a scrolled PDF or comic, Page Down and Page Up put the next or previous page at the top of
-  the window, as do the left and right arrow keys and taps on the sides of the page. Space goes
-  a screenful at a time, stopping at the edges of pages.
+- In a scrolled PDF or comic, Page Up, Page Down, the arrows and side taps turn a page at a time.
+- Space in a scrolled PDF or comic goes a screenful at a time, stopping at the edges of pages.
 - The progress of a PDF or comic sits beside the page rather than on it, where there is room.
-- Adding many books at once no longer slows down as the library grows: 1,500 books take half
-  a minute rather than five.
-- A large library opens faster, and stays quick to search and scroll: covers load as they come
-  into view, and books out of view aren't laid out.
+- Adding many books no longer slows as the library grows: 1,500 take 30 seconds, not 5 minutes.
+- A large library opens faster and stays quick to search and scroll.
 - Carrel downloads 1 MB less to work offline, and less code before the library shows.
 
 ### Fixed
 
 - On iPhone and iPad, MOBI, AZW3, FB2 and CBZ books can be chosen in the file picker.
-- Saving a backup or a book from Carrel on the Home Screen of an iPhone or iPad opens the share
-  sheet, where Save to Files is, instead of a preview with no way back. A backup that takes a
-  while to make asks for a second tap.
+- On an iPhone or iPad Home Screen, saving a book or backup opens the share sheet, not a dead end.
+- On iPhone and iPad, a backup that takes a while to make asks for a second tap to save it.
 - PDFs open in older browsers too, from Safari 18 on.
 - Tapping a text field or a menu on a phone no longer zooms the page in.
 - Nothing sits under a phone's notch, Dynamic Island or home indicator.
 - Books can be added with Lockdown Mode on.
-- A page of a scrolled PDF or comic fitted under Whole page fills the window's height, where it
-  stopped a little short.
-- A backup made in Firefox, Safari, or on a phone or tablet is written to disk as it is made
-  rather than held in memory, so a library too large for the browser's memory can be backed up.
+- Under Whole page, a scrolled PDF or comic page fills the window's height instead of falling short.
+- A library too large for memory can be backed up in Firefox, Safari and on phones and tablets.
 
 ## [0.1.1] - 2026-10-27
 
@@ -63,8 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A library of EPUB, MOBI, AZW3, FB2, CBZ and PDF books, kept in the browser's own storage.
 - Books are added from the file picker, by dropping them on the page, or with "Open with".
 - A book already in the library is recognised by its contents and not added twice.
-- The library shows covers or a list, searched, and sorted by when books were read or added,
-  by title or by author.
+- The library shows covers or a list, searched and sorted by last read, added, title or author.
 - Several books are chosen and removed together; Shift-click chooses a run of them.
 - A book's details: description, publisher, date, language, subjects, file and progress.
 - Paged or scrolled layout, one or two columns, page-turn animations and full screen.

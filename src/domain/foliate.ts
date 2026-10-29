@@ -6,6 +6,7 @@
 
 import type { Book, ResourceDataDetail, ResourceLoadDetail } from 'foliate-js/view.js'
 import { relativeFontSizes, relativeFontSizesInDocument } from '@/domain/fontSizes'
+import { formatOf } from '@/domain/formats'
 import { markupParseType, sanitizeDocument, sanitizeMarkup } from '@/domain/sanitize'
 
 export type { Book } from 'foliate-js/view.js'
@@ -70,8 +71,18 @@ function guardOldMobi(book: Book): void {
 }
 
 export async function openBook(file: File): Promise<Book> {
-  const { makeBook } = await loadFoliate()
-  const book = await makeBook(file)
+  const { makeBook, NotFoundError } = await loadFoliate()
+  let book: Book
+  if (formatOf(file) === 'TXT') {
+    const { decodeText, divideText, makeTextBook } = await import('@/domain/txt')
+    const text = decodeText(new Uint8Array(await file.arrayBuffer()), navigator.languages)
+    const chapters = divideText(text)
+    // A file with no text in it is empty, as foliate-js reports a file with no bytes.
+    if (chapters.length === 0) throw new NotFoundError('File not found')
+    book = makeTextBook(chapters)
+  } else {
+    book = await makeBook(file)
+  }
   guard(book)
   return book
 }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Book } from '@/domain/db'
 import type { ImportOutcome } from '@/domain/library'
 
 const outcome = vi.hoisted(() => ({ next: null as ImportOutcome | null }))
@@ -8,7 +9,15 @@ vi.mock('@/domain/library', () => ({
 
 const { resultShownMs, useImports } = await import('@/store/imports')
 
-const book = { id: 'a', title: 'A', authors: [], language: null, addedAt: 0, openedAt: null }
+const book: Book = {
+  id: 'a',
+  title: 'A',
+  authors: [],
+  language: null,
+  format: 'EPUB',
+  addedAt: 0,
+  openedAt: null,
+}
 const file = new File(['a'], 'a.epub')
 
 /** Lets the queued import run to its result. */

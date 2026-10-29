@@ -201,7 +201,7 @@ test('refuses a file that isn’t a backup', async ({ page }) => {
 
 test('says why a file can’t be added as a font', async ({ page }) => {
   const settings = await openSettings(page)
-  await settings.locator('input[type="file"][accept*=".woff2"]').setInputFiles(fixtures.text())
+  await settings.locator('input[type="file"][accept*=".woff2"]').setInputFiles(fixtures.notes())
   await expect(settings.getByRole('status')).toContainText('isn’t a font file Carrel can use')
   await expect(settings.getByRole('region', { name: 'Your fonts' })).toContainText('No fonts yet')
 })

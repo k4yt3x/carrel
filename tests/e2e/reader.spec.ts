@@ -96,6 +96,36 @@ test('jumps to a chapter from the contents', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Contents' })).toBeFocused()
 })
 
+test('reads a plain-text book in chapters, its text decoded', async ({ page }) => {
+  await page.goto('/')
+  await addBooks(page, fixtures.plainText())
+  await openBook(page, 'A Plain Text Book')
+  // The headings and the first paragraph of the sections on show.
+  const shown = () =>
+    page.locator('foliate-view').evaluate((view) =>
+      (view as unknown as { renderer: { getContents(): { doc: Document }[] } }).renderer
+        .getContents()
+        .flatMap(({ doc }) => [
+          doc.querySelector('h2')?.textContent,
+          doc.querySelector('p')?.textContent,
+        ])
+        .join('\n'),
+    )
+  await expect.poll(shown).toContain('A Plain Text Book')
+  await page.getByRole('button', { name: 'Contents' }).focus()
+  await page.getByRole('button', { name: 'Contents' }).click()
+  const contents = page.getByRole('complementary', { name: 'Contents' })
+  await contents.getByRole('button', { name: 'Chapter 2: The Lamp' }).click()
+  await expect(contents.getByRole('button', { name: 'Chapter 2: The Lamp' })).toHaveAttribute(
+    'aria-current',
+    'location',
+  )
+  await expect.poll(shown).toContain('Chapter 2: The Lamp')
+  // Latin-1, read as such rather than as UTF-8.
+  expect(await shown()).toContain('Paragraph 1 of chapter 2. The reading room')
+  expect(await shown()).toContain("à l'étude.")
+})
+
 test('folds the parts of the contents, and resizes them', async ({ page }) => {
   await page.goto('/')
   await addBooks(page, fixtures.described())

@@ -3,7 +3,7 @@ import { arrangeBooks } from '@/domain/arrange'
 import type { Book } from '@/domain/db'
 
 const book = (title: string, authors: string[], addedAt: number, openedAt: number | null = null) =>
-  ({ id: title, title, authors, language: null, addedAt, openedAt }) satisfies Book
+  ({ id: title, title, authors, language: null, format: 'EPUB', addedAt, openedAt }) satisfies Book
 
 const library = [
   book('Émile', ['Jean-Jacques Rousseau'], 1, 50),

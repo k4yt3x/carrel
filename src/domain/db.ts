@@ -11,6 +11,7 @@
  */
 
 import Dexie, { type EntityTable } from 'dexie'
+import type { BookFormat } from '@/domain/formats'
 import type { ReadingSettings } from '@/domain/settings'
 
 export interface Book {
@@ -20,6 +21,8 @@ export interface Book {
   authors: string[]
   /** BCP 47 tag from the book's metadata, or null when it declares none. */
   language: string | null
+  /** The format the book's file is named as (formatOf), or null when it is named as none. */
+  format: BookFormat | null
   /** Milliseconds since the epoch. */
   addedAt: number
   /** Milliseconds since the epoch; null until the book is first opened. */
@@ -97,3 +100,42 @@ db.version(2).stores({
   bookSettings: 'id',
   fonts: 'id, family',
 })
+
+// Books gain the format their file is named as, which the library shows, worked out from each
+// stored file's name and media type. The extensions and types are those of the formats Carrel
+// read before this step, written out here so that the step stays as it is when formats change.
+db.version(3)
+  .stores({})
+  .upgrade(async (tx) => {
+    const extensions: [string, string][] = [
+      ['.epub', 'EPUB'],
+      ['.mobi', 'MOBI'],
+      ['.azw', 'MOBI'],
+      ['.azw3', 'AZW3'],
+      ['.kf8', 'AZW3'],
+      ['.fb2', 'FB2'],
+      ['.fbz', 'FB2'],
+      ['.cbz', 'CBZ'],
+      ['.pdf', 'PDF'],
+    ]
+    const types = new Map([
+      ['application/epub+zip', 'EPUB'],
+      ['application/x-mobipocket-ebook', 'MOBI'],
+      ['application/x-fictionbook+xml', 'FB2'],
+      ['application/x-zip-compressed-fb2', 'FB2'],
+      ['application/vnd.comicbook+zip', 'CBZ'],
+      ['application/pdf', 'PDF'],
+    ])
+    const formats = new Map<string, string | null>()
+    await tx.table('files').each(({ id, file }: { id: string; file: File }) => {
+      const name = file.name.toLowerCase()
+      const named = extensions.find(([extension]) => name.endsWith(extension))?.[1]
+      formats.set(id, named ?? types.get(file.type) ?? null)
+    })
+    await tx
+      .table('books')
+      .toCollection()
+      .modify((book: { id: string; format?: string | null }) => {
+        book.format = formats.get(book.id) ?? null
+      })
+  })

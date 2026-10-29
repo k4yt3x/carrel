@@ -23,7 +23,7 @@ import { Modal } from '@/ui/Modal'
 
 const listFormat = new Intl.ListFormat(undefined, { style: 'short', type: 'conjunction' })
 const percent = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 0 })
-type Loaded = { details: BookDetails; file: { name: string; size: number } }
+type Loaded = { details: BookDetails; file: { size: number } }
 type State = Loaded | 'loading' | 'failed'
 
 /**
@@ -66,12 +66,6 @@ function formatPublished(value: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'long', timeZone: 'UTC' }).format(
     Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1),
   )
-}
-
-/** The format, from the file's extension: what the reader knows the file as. */
-function formatOf(fileName: string): string {
-  const match = /\.(fb2\.zip|[a-z0-9]+)$/i.exec(fileName)
-  return match?.[1]?.replace(/\.zip$/i, '').toUpperCase() ?? 'File'
 }
 
 const roleLabels = { translator: 'Translator', editor: 'Editor', illustrator: 'Illustrator' }
@@ -193,7 +187,8 @@ export function BookDetailsDialog({ book, metadata, onClose }: BookDetailsDialog
             )}
             {file && (
               <Row label="File">
-                {formatOf(file.name)}, {formatBytes(file.size)}
+                {book.format && `${book.format}, `}
+                {formatBytes(file.size)}
               </Row>
             )}
             <Row label="Added">{formatDay(book.addedAt)}</Row>
