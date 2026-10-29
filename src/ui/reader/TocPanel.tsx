@@ -202,6 +202,8 @@ interface TocPanelProps extends TocProps {
   /** The docked contents' width, in pixels, which the reader can drag. */
   width: number
   onResize(width: number): void
+  /** Told when a drag of the edge takes hold and when it lets go. */
+  onResizeHold(holding: boolean): void
 }
 
 /**
@@ -209,9 +211,22 @@ interface TocPanelProps extends TocProps {
  * while the reader reads, closed only by its own button or Escape; on a narrow one it is a
  * sheet that closes once a chapter is chosen.
  */
-export function TocPanel({ docked, closeOnSelect, width, onResize, ...props }: TocPanelProps) {
+export function TocPanel({
+  docked,
+  closeOnSelect,
+  width,
+  onResize,
+  onResizeHold,
+  ...props
+}: TocPanelProps) {
   return docked ? (
-    <TocSidebar {...props} closeOnSelect={closeOnSelect} width={width} onResize={onResize} />
+    <TocSidebar
+      {...props}
+      closeOnSelect={closeOnSelect}
+      width={width}
+      onResize={onResize}
+      onResizeHold={onResizeHold}
+    />
   ) : (
     <TocSheet {...props} />
   )
@@ -251,7 +266,11 @@ const widest = () =>
  * The edge the docked contents are resized by: dragged, or with the arrow keys once focused,
  * as a window splitter.
  */
-function ResizeHandle({ width, onResize }: { width: number; onResize(width: number): void }) {
+function ResizeHandle({
+  width,
+  onResize,
+  onResizeHold,
+}: Pick<TocPanelProps, 'width' | 'onResize' | 'onResizeHold'>) {
   const drag = useRef<{ x: number; width: number } | null>(null)
   const resize = (next: number) =>
     onResize(Math.round(Math.max(tocWidthLimits.min, Math.min(widest(), next))))
@@ -271,12 +290,14 @@ function ResizeHandle({ width, onResize }: { width: number; onResize(width: numb
         event.preventDefault()
         event.currentTarget.setPointerCapture(event.pointerId)
         drag.current = { x: event.clientX, width }
+        onResizeHold(true)
       }}
       onPointerMove={(event) => {
         if (drag.current) resize(drag.current.width + event.clientX - drag.current.x)
       }}
       onLostPointerCapture={() => {
         drag.current = null
+        onResizeHold(false)
       }}
       onKeyDown={(event) => {
         const step = event.shiftKey ? 64 : 16
@@ -304,7 +325,8 @@ function TocSidebar({
   closeOnSelect,
   width,
   onResize,
-}: TocProps & { closeOnSelect: boolean; width: number; onResize(width: number): void }) {
+  onResizeHold,
+}: TocProps & Pick<TocPanelProps, 'closeOnSelect' | 'width' | 'onResize' | 'onResizeHold'>) {
   const list = useRef<HTMLDivElement>(null)
   const titleId = useId()
 
@@ -365,7 +387,7 @@ function TocSidebar({
           }}
         />
       </div>
-      <ResizeHandle width={width} onResize={onResize} />
+      <ResizeHandle width={width} onResize={onResize} onResizeHold={onResizeHold} />
     </aside>
   )
 }

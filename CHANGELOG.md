@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the window, as do the left and right arrow keys and taps on the sides of the page. Space goes
   a screenful at a time, stopping at the edges of pages.
 - The progress of a PDF or comic sits beside the page rather than on it, where there is room.
+- Adding many books at once no longer slows down as the library grows: 1,500 books take half
+  a minute rather than five.
+- A large library opens faster, and stays quick to search and scroll: covers load as they come
+  into view, and books out of view aren't laid out.
+- Carrel downloads 1 MB less to work offline, and less code before the library shows.
 
 ### Fixed
 
@@ -32,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Books can be added with Lockdown Mode on.
 - A page of a scrolled PDF or comic fitted under Whole page fills the window's height, where it
   stopped a little short.
+- A backup made in Firefox, Safari, or on a phone or tablet is written to disk as it is made
+  rather than held in memory, so a library too large for the browser's memory can be backed up.
 
 ## [0.1.1] - 2026-10-27
 

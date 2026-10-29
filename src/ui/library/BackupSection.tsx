@@ -10,11 +10,11 @@
  * confirms, choosing whether its theme and reading settings replace theirs.
  */
 
-import { useLiveQuery } from 'dexie-react-hooks'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { BackupSummary, RestoreOutcome } from '@/domain/backup'
 import { db } from '@/domain/db'
 import { isQuotaError, requestPersistentStorage, storageFullMessage } from '@/domain/library'
+import { createScratchFile, removeOldScratchFiles, type ScratchFile } from '@/domain/scratchFile'
 import { currentPreferences, normalizePreferences, useAppSettings } from '@/store/appSettings'
 import { Switch } from '@/ui/controls'
 import { pickSaveTarget, saveFile } from '@/ui/download'
@@ -23,7 +23,7 @@ import { formatBytes } from '@/ui/format'
 type State =
   | { name: 'idle' }
   | { name: 'exporting'; done: number; total: number }
-  | { name: 'saving'; file: File }
+  | { name: 'saving'; file: File; scratch: ScratchFile | null }
   | { name: 'exported' }
   | { name: 'checking' }
   | { name: 'confirming'; file: File; summary: BackupSummary }
@@ -69,47 +69,85 @@ function outcomeMessage(outcome: RestoreOutcome): string {
   return message
 }
 
-export function BackupSection() {
+export function BackupSection({ open }: { open: boolean }) {
   const [state, setState] = useState<State>({ name: 'idle' })
   const [includeBooks, setIncludeBooks] = useState(true)
   const [usePreferences, setUsePreferences] = useState(true)
   const picker = useRef<HTMLInputElement>(null)
   const setPreferences = useAppSettings((s) => s.setPreferences)
-  // The books' files are listed only for their sizes; their bytes stay where they are.
-  const booksSize = useLiveQuery(async () => {
-    let total = 0
-    await db.files.each((record) => {
-      total += record.file.size
-    })
-    return total
-  }, [])
+  const [booksSize, setBooksSize] = useState<number>()
   const busy = ['exporting', 'checking', 'restoring'].includes(state.name)
 
+  // Summing the sizes reads every file's record (not its bytes), so it runs when the settings
+  // open and after a restore, not after each book added: an import or restore of many books
+  // would otherwise read the whole table once per book.
+  useEffect(() => {
+    if (!open || busy) return
+    let current = true
+    let total = 0
+    db.files
+      .each((record) => {
+        total += record.file.size
+      })
+      .then(() => {
+        if (current) setBooksSize(total)
+      })
+      .catch((error: unknown) => console.error('could not size the book files', error))
+    return () => {
+      current = false
+    }
+  }, [open, busy])
+
+  // Backup files left from earlier visits, kept for their downloads to finish, are cleared.
+  useEffect(() => {
+    removeOldScratchFiles().catch((error: unknown) => {
+      console.warn('could not clear old backup files', error)
+    })
+  }, [])
+
   const exportBackup = async () => {
+    let scratch: ScratchFile | null = null
     try {
       const name = backupName()
       const target = await pickSaveTarget(name, 'Carrel backup', 'application/zip', '.zip')
       if (target === 'cancelled') return
       setState({ name: 'exporting', done: 0, total: 0 })
       const { exportLibrary } = await loadBackup()
-      const blob = await exportLibrary(target, {
+      // Without a file of the reader's choosing, the backup goes into one of the app's own on
+      // disk, where the browser has them, rather than into memory, which a large library
+      // could run out of.
+      scratch = target ? null : await createScratchFile(name)
+      const blob = await exportLibrary(target ?? scratch?.stream ?? null, {
         includeBooks,
         preferences: currentPreferences(),
         onProgress: (done, total) => setState({ name: 'exporting', done, total }),
       })
-      if (blob) await save(new File([blob], name, { type: 'application/zip' }))
-      else setState({ name: 'exported' })
+      if (scratch) {
+        await save(new File([await scratch.file()], name, { type: 'application/zip' }), scratch)
+      } else if (blob) {
+        await save(new File([blob], name, { type: 'application/zip' }), null)
+      } else {
+        setState({ name: 'exported' })
+      }
     } catch (error) {
+      await scratch?.remove().catch(() => {})
       setState({ name: 'failed', message: failure(error, 'export') })
     }
   }
 
   // Making a backup can outlast the few seconds after a tap in which the share sheet opens;
   // the backup then waits for a tap of its own, as it does when the sheet is dismissed.
-  const save = async (file: File) => {
+  const save = async (file: File, scratch: ScratchFile | null) => {
     try {
       const result = await saveFile(file, file.name)
-      setState(result === 'saved' ? { name: 'exported' } : { name: 'saving', file })
+      if (result === 'retry' || result === 'cancelled') {
+        setState({ name: 'saving', file, scratch })
+        return
+      }
+      setState({ name: 'exported' })
+      // The share sheet has its own copy now. A download goes on reading the file, which
+      // removeOldScratchFiles clears later.
+      if (result === 'shared') await scratch?.remove()
     } catch (error) {
       setState({ name: 'failed', message: failure(error, 'export') })
     }
@@ -184,7 +222,11 @@ export function BackupSection() {
       {state.name === 'saving' && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-sunken p-4">
           <p className="flex-1 text-sm leading-normal text-fg">Your backup is ready.</p>
-          <button type="button" className="btn btn-primary" onClick={() => save(state.file)}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => save(state.file, state.scratch)}
+          >
             Save backup…
           </button>
         </div>

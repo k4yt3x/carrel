@@ -21,7 +21,7 @@ import {
   TextWriter,
   ZipReader,
   ZipWriter,
-} from '@zip.js/zip.js'
+} from '@zip.js/zip.js/lib/zip-core-native.js'
 import Dexie from 'dexie'
 import {
   type Book,
@@ -36,7 +36,8 @@ import { normalizeReadingSettings, type ReadingSettings } from '@/domain/setting
 import { sha256 } from '@/domain/sha256'
 
 // zip.js otherwise compresses in workers started from blob: URLs, which the app's content
-// security policy forbids.
+// security policy forbids. Its native build (above) leaves compression to the browser's own
+// CompressionStream rather than bundling a codec.
 configure({ useWebWorkers: false })
 
 /** A backup that cannot be read, with the reason worded for the person restoring it. */

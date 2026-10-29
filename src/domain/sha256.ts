@@ -1,4 +1,4 @@
-import { createSHA256 } from 'hash-wasm'
+import type { createSHA256 } from 'hash-wasm'
 
 /**
  * SHA-256 of a blob's bytes as lowercase hex.
@@ -10,6 +10,8 @@ import { createSHA256 } from 'hash-wasm'
 export async function sha256(blob: Blob): Promise<string> {
   let hasher: Awaited<ReturnType<typeof createSHA256>>
   try {
+    // Loaded with the first book added, not with the app.
+    const { createSHA256 } = await import('hash-wasm')
     hasher = await createSHA256()
   } catch (error) {
     // Lockdown Mode on iPhone, iPad and Mac turns WebAssembly off. WebCrypto gives the same

@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
-import { type ReactNode, type ToggleEvent, useId, useRef } from 'react'
+import { type ReactNode, type ToggleEvent, useId, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 export interface MenuItem {
   label: string
@@ -35,12 +36,16 @@ export function Menu({ children, label, tooltip, buttonClassName, align, items }
   const id = useId()
   const button = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
+  // The actions are drawn only while the menu shows: a shelf of books has a menu for each.
+  const [open, setOpen] = useState(false)
 
   // The menu is detached from the button in the top layer. Before it shows, it is placed under
   // the button, lined up with the chosen edge; once it has a size, it flips above the button
   // if it would run off the bottom of the viewport, and moves in from a side it would run off.
   const placeBelow = (event: ToggleEvent<HTMLDivElement>) => {
     if (event.newState !== 'open' || !button.current || !menu.current) return
+    // In place before the menu shows, so it shows whole and is measured whole below.
+    flushSync(() => setOpen(true))
     const anchor = button.current.getBoundingClientRect()
     Object.assign(
       menu.current.style,
@@ -54,6 +59,7 @@ export function Menu({ children, label, tooltip, buttonClassName, align, items }
     )
   }
   const keepInView = (event: ToggleEvent<HTMLDivElement>) => {
+    if (event.newState !== 'open') setOpen(false)
     if (event.newState !== 'open' || !button.current || !menu.current) return
     const anchor = button.current.getBoundingClientRect()
     const { offsetWidth: width, offsetHeight: height, style } = menu.current
@@ -88,20 +94,21 @@ export function Menu({ children, label, tooltip, buttonClassName, align, items }
         onToggle={keepInView}
         className="inset-auto m-0 min-w-48 rounded-lg border-0 bg-surface-raised p-1 text-fg shadow-lg ring-1 ring-border"
       >
-        {items.map(({ label: itemLabel, icon: Icon, danger, onSelect }) => (
-          <button
-            key={itemLabel}
-            type="button"
-            className={`${item} ${danger ? 'text-danger-fg' : ''}`}
-            onClick={() => {
-              menu.current?.hidePopover()
-              onSelect()
-            }}
-          >
-            <Icon aria-hidden className={`size-4 ${danger ? '' : 'text-fg-muted'}`} />
-            {itemLabel}
-          </button>
-        ))}
+        {open &&
+          items.map(({ label: itemLabel, icon: Icon, danger, onSelect }) => (
+            <button
+              key={itemLabel}
+              type="button"
+              className={`${item} ${danger ? 'text-danger-fg' : ''}`}
+              onClick={() => {
+                menu.current?.hidePopover()
+                onSelect()
+              }}
+            >
+              <Icon aria-hidden className={`size-4 ${danger ? '' : 'text-fg-muted'}`} />
+              {itemLabel}
+            </button>
+          ))}
       </div>
     </>
   )

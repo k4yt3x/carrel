@@ -77,6 +77,7 @@ import { themeSearchMarks } from '@/ui/reader/searchMarks'
 import { TocPanel } from '@/ui/reader/TocPanel'
 import { adjacentChapters, flattenToc } from '@/ui/reader/tocTree'
 import { useFontFaces } from '@/ui/reader/useFontFaces'
+import { useHeld } from '@/ui/reader/useHeld'
 import { useReadingSettings } from '@/ui/reader/useReadingSettings'
 import { useMediaQuery } from '@/ui/useMediaQuery'
 import { useTheme } from '@/ui/useTheme'
@@ -159,11 +160,17 @@ function startsBook(position: RelocateDetail): boolean {
   if (section?.current !== 0 || !range) return position.fraction <= 0
   try {
     const doc = range.startContainer.ownerDocument
-    const before = doc?.createRange()
-    if (!doc || !before) return position.fraction <= 0
-    before.setStart(doc.body ?? doc.documentElement, 0)
-    before.setEnd(range.startContainer, range.startOffset)
-    return before.toString().trim() === ''
+    if (!doc) return position.fraction <= 0
+    // The text before what is on show, read up to its first letter: a book whose first file
+    // holds all of it would otherwise be copied up to the page on show.
+    const walker = doc.createTreeWalker(doc.body ?? doc.documentElement, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const text = node.textContent ?? ''
+      if (node === range.startContainer) return text.slice(0, range.startOffset).trim() === ''
+      if (range.comparePoint(node, 0) >= 0) return true
+      if (text.trim() !== '') return false
+    }
+    return true
   } catch {
     // A page being replaced can leave the range pointing into a document that is gone.
     return position.fraction <= 0
@@ -409,10 +416,15 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   const [tocOpen, setTocOpen] = useState(false)
   const contentsButton = useRef<HTMLButtonElement>(null)
   const wide = useMediaQuery('(min-width: 40rem)')
-  const textOffset = useAppSettings((state) => state.textOffset)
-  const setTextOffset = useAppSettings((state) => state.setTextOffset)
-  const tocWidth = useAppSettings((state) => state.tocWidth)
-  const setTocWidth = useAppSettings((state) => state.setTocWidth)
+  // Both follow a drag at once, and are saved when it lets go.
+  const savedOffset = useAppSettings((state) => state.textOffset)
+  const saveOffset = useAppSettings((state) => state.setTextOffset)
+  const offsetSetting = useHeld(savedOffset, saveOffset)
+  const textOffset = offsetSetting.value
+  const savedTocWidth = useAppSettings((state) => state.tocWidth)
+  const saveTocWidth = useAppSettings((state) => state.setTocWidth)
+  const tocWidthSetting = useHeld(savedTocWidth, saveTocWidth)
+  const tocWidth = tocWidthSetting.value
   // A line through the middle of the text while the offset is being dragged, and for a moment
   // after, to line it up with the middle of the screen.
   const [guide, setGuide] = useState(false)
@@ -834,6 +846,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
     ? Math.min(offsetLimits.max, Math.max(offsetLimits.min, textOffset))
     : 0
   const holdGuide = (holding: boolean) => {
+    offsetSetting.hold(holding)
     clearTimeout(guideTimer.current)
     if (holding) setGuide(true)
     else guideTimer.current = setTimeout(() => setGuide(false), 1200)
@@ -881,7 +894,10 @@ export function ReaderPage({ bookId }: { bookId: string }) {
   }
   // A fixed layout counts in pages; reflowable text by what is on show (see startsBook).
   const pages = fixedLayout ? position?.section : undefined
-  const atBeginning = pages ? pages.current === 0 : position === null || startsBook(position)
+  const atBeginning = useMemo(
+    () => (pages ? pages.current === 0 : position === null || startsBook(position)),
+    [pages, position],
+  )
   const atEnd = pages ? pages.current >= pages.total - 1 : (position?.fraction ?? 0) >= 0.9999
   const progress =
     scrub !== null && settings?.progress !== 'none'
@@ -1261,7 +1277,8 @@ export function ReaderPage({ bookId }: { bookId: string }) {
         docked={wide}
         closeOnSelect={!placement.clear}
         width={tocShownWidth}
-        onResize={setTocWidth}
+        onResize={tocWidthSetting.change}
+        onResizeHold={tocWidthSetting.hold}
         items={toc}
         current={position?.tocItem ?? undefined}
         onSelect={goTo}
@@ -1296,7 +1313,7 @@ export function ReaderPage({ bookId }: { bookId: string }) {
               ? {
                   value: shownOffset,
                   range: offsetLimits,
-                  onChange: setTextOffset,
+                  onChange: offsetSetting.change,
                   onHoldChange: holdGuide,
                 }
               : undefined

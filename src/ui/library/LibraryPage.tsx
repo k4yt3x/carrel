@@ -23,7 +23,17 @@
 
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowDown, LayoutGrid, List, Plus, Search, Settings, Trash2, X } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { arrangeBooks, isSortOrder, type SortOrder } from '@/domain/arrange'
 import { type Book, db } from '@/domain/db'
 import { bookExtensions } from '@/domain/formats'
@@ -34,11 +44,12 @@ import { BookDetailsDialog } from '@/ui/BookDetails'
 import { ConfirmDialog } from '@/ui/ConfirmDialog'
 import { saveFile } from '@/ui/download'
 import { BookCard, BookRow, listColumns } from '@/ui/library/BookCard'
+import { forgetCovers } from '@/ui/library/covers'
 import { DropOverlay } from '@/ui/library/DropOverlay'
 import { EmptyLibrary } from '@/ui/library/EmptyLibrary'
-import { LibrarySettings } from '@/ui/library/LibrarySettings'
 import { toggleSelection } from '@/ui/library/selection'
 import { pickerAccept } from '@/ui/platform'
+import { useThrottledLiveQuery } from '@/ui/useThrottledLiveQuery'
 
 const sortLabels: Record<SortOrder, string> = {
   recent: 'Recently read',
@@ -48,6 +59,11 @@ const sortLabels: Record<SortOrder, string> = {
 }
 
 const count = new Intl.NumberFormat()
+
+// Settings load apart from the library, as soon as it is drawn rather than before.
+const LibrarySettings = lazy(async () => ({
+  default: (await import('@/ui/library/LibrarySettings')).LibrarySettings,
+}))
 
 /** A heading of the list that sorts the books by its column, marked while it does. */
 function SortHeading({
@@ -84,7 +100,8 @@ const bookTarget = (id: string) =>
   document.querySelector<HTMLElement>(`[data-book="${CSS.escape(id)}"]`)
 
 export function LibraryPage() {
-  const books = useLiveQuery(() => db.books.toArray(), [])
+  // An import adds books faster than the shelf can be laid out again for each.
+  const books = useThrottledLiveQuery(() => db.books.toArray(), 250)
   const progress = useLiveQuery(
     async () => new Map((await db.progress.toArray()).map((p) => [p.id, p.fraction])),
     [],
@@ -108,7 +125,14 @@ export function LibraryPage() {
   const [downloadFailed, setDownloadFailed] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
-  const shown = useMemo(() => arrangeBooks(books ?? [], sort, query), [books, sort, query])
+  // The field shows each letter as it is typed; the shelf follows when it has drawn.
+  const searched = useDeferredValue(query)
+  const shown = useMemo(() => arrangeBooks(books ?? [], sort, searched), [books, sort, searched])
+  // For the books' own actions, which stay the same from one drawing to the next.
+  const shownNow = useRef(shown)
+  useLayoutEffect(() => {
+    shownNow.current = shown
+  })
   // Only books on show count as chosen, so nothing out of sight is acted on.
   const chosen = shown.filter((book) => selected.has(book.id))
   const allChosen = shown.length > 0 && chosen.length === shown.length
@@ -121,7 +145,7 @@ export function LibraryPage() {
 
   const hasBooks = books !== undefined && books.length > 0
 
-  const download = async (book: Book) => {
+  const download = useCallback(async (book: Book) => {
     setDownloadFailed(null)
     try {
       const file = await loadBookFile(book.id)
@@ -132,7 +156,7 @@ export function LibraryPage() {
       console.error('could not download the book', error)
       setDownloadFailed(book.title)
     }
-  }
+  }, [])
   const Item = layout === 'list' ? BookRow : BookCard
 
   // Switching modes takes away the control that had the focus (Select, a book's menu, a
@@ -144,13 +168,13 @@ export function LibraryPage() {
     focusAfterSwitch.current = null
   })
 
-  const startSelecting = (book?: Book) => {
+  const startSelecting = useCallback((book?: Book) => {
     setSelected(new Set(book ? [book.id] : []))
     anchor.current = book?.id ?? null
-    const first = book?.id ?? shown[0]?.id
+    const first = book?.id ?? shownNow.current[0]?.id
     focusAfterSwitch.current = first ? () => bookTarget(first) : null
     setSelecting(true)
-  }
+  }, [])
   const stopSelecting = useCallback(() => {
     const focused = document.activeElement?.closest<HTMLElement>('[data-book]')?.dataset.book
     focusAfterSwitch.current = focused ? () => bookTarget(focused) : () => selectButton.current
@@ -158,15 +182,15 @@ export function LibraryPage() {
     setSelected(new Set())
     anchor.current = null
   }, [])
-  const toggle = (book: Book, range: boolean) => {
+  const toggle = useCallback((book: Book, range: boolean) => {
     // Read now: the update runs later, after the anchor has moved to this book.
     const from = anchor.current
-    const order = shown.map((each) => each.id)
+    const order = shownNow.current.map((each) => each.id)
     setSelected((current) =>
       toggleSelection({ selected: current, order, id: book.id, anchor: from, range }),
     )
     anchor.current = book.id
-  }
+  }, [])
   const selectAll = useCallback(() => setSelected(new Set(shown.map((book) => book.id))), [shown])
 
   // While choosing, Escape stops and Ctrl+A (or Command+A) chooses every book on show. Keys
@@ -343,7 +367,7 @@ export function LibraryPage() {
         )}
         {hasBooks && shown.length === 0 && (
           <div className="py-24 text-center">
-            <p className="text-fg">No books match “{query}”.</p>
+            <p className="text-fg">No books match “{searched}”.</p>
             <button
               type="button"
               className="btn btn-link mt-2 text-action-fg"
@@ -431,11 +455,13 @@ export function LibraryPage() {
         }}
       />
       <DropOverlay onDrop={onDrop} />
-      <LibrarySettings
-        open={settings !== 'closed'}
-        restore={settings === 'restore'}
-        onClose={() => setSettings('closed')}
-      />
+      <Suspense fallback={null}>
+        <LibrarySettings
+          open={settings !== 'closed'}
+          restore={settings === 'restore'}
+          onClose={() => setSettings('closed')}
+        />
+      </Suspense>
       <BookDetailsDialog book={detailed} onClose={() => setDetailed(null)} />
       <ConfirmDialog
         open={removing !== null}
@@ -444,7 +470,10 @@ export function LibraryPage() {
         failureMessage="The book couldn’t be removed. Try again."
         onCancel={() => setRemoving(null)}
         onConfirm={async () => {
-          if (removing) await removeBook(removing.id)
+          if (removing) {
+            await removeBook(removing.id)
+            forgetCovers([removing.id])
+          }
           setRemoving(null)
         }}
       >
@@ -461,7 +490,9 @@ export function LibraryPage() {
         failureMessage="The books couldn’t be removed. Try again."
         onCancel={() => setRemovingChosen(false)}
         onConfirm={async () => {
-          await removeBooks(chosen.map((book) => book.id))
+          const ids = chosen.map((book) => book.id)
+          await removeBooks(ids)
+          forgetCovers(ids)
           setRemovingChosen(false)
           stopSelecting()
         }}

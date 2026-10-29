@@ -1,9 +1,8 @@
-import { useSyncExternalStore } from 'react'
+import { lazy, Suspense, useEffect, useSyncExternalStore } from 'react'
 import { parseRoute } from '@/domain/routes'
 import { ImportNotice } from '@/ui/library/ImportNotice'
 import { LibraryPage } from '@/ui/library/LibraryPage'
 import { UpdateNotice } from '@/ui/library/UpdateNotice'
-import { ReaderPage } from '@/ui/reader/ReaderPage'
 import { Tooltips } from '@/ui/Tooltips'
 import { useLaunchFiles } from '@/ui/useLaunchFiles'
 import { useThemeEffect } from '@/ui/useTheme'
@@ -15,14 +14,29 @@ const subscribe = (onChange: () => void) => {
 
 const getHash = () => window.location.hash
 
+// The reader is most of the app's code, and isn't needed to show the library. It loads on its
+// own, once the library has had its moment, so a book opens without waiting for it.
+const loadReader = () => import('@/ui/reader/ReaderPage')
+const ReaderPage = lazy(async () => ({ default: (await loadReader()).ReaderPage }))
+const readerPreloadMs = 2000
+
 export function App() {
   useThemeEffect()
   useLaunchFiles()
   const route = parseRoute(useSyncExternalStore(subscribe, getHash))
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadReader().catch((error: unknown) => console.error('could not load the reader', error))
+    }, readerPreloadMs)
+    return () => clearTimeout(timer)
+  }, [])
   return (
     <>
       {route.name === 'reader' ? (
-        <ReaderPage key={route.bookId} bookId={route.bookId} />
+        // The page stays blank for the moment the reader takes to load, if it hasn't yet.
+        <Suspense fallback={null}>
+          <ReaderPage key={route.bookId} bookId={route.bookId} />
+        </Suspense>
       ) : (
         <LibraryPage />
       )}

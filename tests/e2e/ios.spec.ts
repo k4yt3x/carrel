@@ -15,6 +15,19 @@ const addBooks = async (page: Page, ...files: FixtureFile[]) => {
   await expect(page.getByRole('status')).toContainText('Added')
 }
 
+/** The files a backup was written to in the app's private file system, where it has any. */
+const backupFiles = (page: Page) =>
+  page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory()
+    const names: string[] = []
+    try {
+      for await (const name of (await root.getDirectoryHandle('backups')).keys()) names.push(name)
+    } catch {
+      // No backup has made the folder.
+    }
+    return names
+  })
+
 const openBook = async (page: Page, title: string) => {
   await page.getByRole('link', { name: title }).first().click()
   await expect(page.getByRole('button', { name: 'Reading settings' })).toBeAttached()
@@ -83,6 +96,8 @@ test('saves files through the share sheet in the Home Screen app, again on a lat
       size: expect.any(Number),
     },
   ])
+  // The share sheet has its copy; the one written on disk goes.
+  await expect.poll(() => backupFiles(page)).toEqual([])
   await settings.getByRole('button', { name: 'Close settings' }).click()
 
   await page.getByRole('button', { name: 'More actions for The Test Book' }).click()

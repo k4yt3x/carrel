@@ -1,11 +1,10 @@
-import { useLiveQuery } from 'dexie-react-hooks'
 import { Check } from 'lucide-react'
-import type { MouseEvent, ReactNode } from 'react'
-import { type Book, db } from '@/domain/db'
+import { type MouseEvent, memo, type ReactNode } from 'react'
+import type { Book } from '@/domain/db'
 import { readerHref } from '@/domain/routes'
 import { formatDay } from '@/ui/format'
 import { BookMenu } from '@/ui/library/BookMenu'
-import { useObjectUrl } from '@/ui/useObjectUrl'
+import { useCover } from '@/ui/library/covers'
 
 const percent = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 0 })
 const listFormat = new Intl.ListFormat(undefined, { style: 'short', type: 'conjunction' })
@@ -40,17 +39,18 @@ export function Cover({
   compact?: boolean
   selected?: boolean
 }) {
-  // undefined while the query runs, null once it has found no cover
-  const cover = useLiveQuery(async () => (await db.covers.get(book.id)) ?? null, [book.id])
-  const url = useObjectUrl(cover?.image)
-  if (cover && url) {
+  const cover = useCover(book.id)
+  if (cover) {
     const narrow = cover.width / cover.height <= 2 / 3
+    // Covers far down a long shelf load as they come into view.
     return (
       <img
-        src={url}
+        src={cover.url}
         alt=""
         width={cover.width}
         height={cover.height}
+        loading="lazy"
+        decoding="async"
         className={`${binding} ${edge(selected)} ${narrow ? 'h-full w-auto' : 'h-auto w-full'}`}
       />
     )
@@ -172,7 +172,34 @@ function ItemEnd({
   )
 }
 
-export function BookCard(props: BookItemProps) {
+/** Two records of a book that say the same: the library reads every book afresh on each change. */
+function sameBook(a: Book, b: Book): boolean {
+  if (a === b) return true
+  const keys = Object.keys(a) as (keyof Book)[]
+  if (keys.length !== Object.keys(b).length) return false
+  return keys.every((key) => {
+    const x = a[key]
+    const y = b[key]
+    if (Array.isArray(x) && Array.isArray(y)) {
+      return x.length === y.length && x.every((each, index) => each === y[index])
+    }
+    return Object.is(x, y)
+  })
+}
+
+/**
+ * Whether a book's item can stay as it was drawn. Without this, adding one book, typing a
+ * letter of a search or choosing a book would redraw every book on the shelf.
+ */
+function sameItem(previous: BookItemProps, next: BookItemProps): boolean {
+  const keys = Object.keys(next) as (keyof BookItemProps)[]
+  if (keys.length !== Object.keys(previous).length) return false
+  return keys.every((key) =>
+    key === 'book' ? sameBook(previous.book, next.book) : Object.is(previous[key], next[key]),
+  )
+}
+
+export const BookCard = memo(function BookCard(props: BookItemProps) {
   const { book, fraction, selecting, selected } = props
   const foot = (
     <div className="mt-auto flex h-8 items-center justify-between">
@@ -186,7 +213,11 @@ export function BookCard(props: BookItemProps) {
     // The progress row sits at the bottom of every card, so a row of books keeps one line for
     // it however many lines their titles take. While choosing, the whole card is the checkbox,
     // its mark included; otherwise the book's menu sits beside the link.
-    <li className="flex flex-col">
+    // A card out of view is skipped when the page is laid out and drawn, at the size it last
+    // had (at first, about a card's height); a long shelf otherwise lays out every card each
+    // time a book is added. That clips what a card draws outside itself, so the card reaches
+    // into the gaps around it, far enough for its focus ring and its cover's shadow.
+    <li className="-m-3 flex flex-col p-3 [contain-intrinsic-block-size:auto_21rem] [content-visibility:auto]">
       <BookTarget
         {...props}
         className="group flex w-full grow flex-col rounded-sm focus-visible:outline-offset-4"
@@ -207,7 +238,7 @@ export function BookCard(props: BookItemProps) {
       {!selecting && foot}
     </li>
   )
-}
+}, sameItem)
 
 /**
  * The columns of the list, shared by its heading and its rows: the cover, the title, then on
@@ -228,7 +259,7 @@ export function listColumns(selecting: boolean): string {
  * The same book as a row of a list, for libraries scanned by title and author rather than by
  * cover. The cover shrinks to a thumbnail that still says which book it is.
  */
-export function BookRow(props: BookItemProps) {
+export const BookRow = memo(function BookRow(props: BookItemProps) {
   const { book, fraction, selecting, selected } = props
   const authors = book.authors.length > 0 ? listFormat.format(book.authors) : ''
   return (
@@ -273,4 +304,4 @@ export function BookRow(props: BookItemProps) {
       {!selecting && <ItemEnd {...props} />}
     </li>
   )
-}
+}, sameItem)

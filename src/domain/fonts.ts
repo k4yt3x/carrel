@@ -236,7 +236,10 @@ const isItalic = (os2: Uint8Array | undefined) =>
  * collection and for anything that is not a font file.
  */
 export async function readFontMetadata(data: Blob): Promise<FontMetadata> {
-  const bytes = new Uint8Array(await data.arrayBuffer())
+  return metadataOf(new Uint8Array(await data.arrayBuffer()), data)
+}
+
+async function metadataOf(bytes: Uint8Array<ArrayBuffer>, data: Blob): Promise<FontMetadata> {
   const format = detectFontFormat(bytes)
   if (format === 'collection') throw new FontImportError(collectionMessage)
   if (format === null) throw notAFont(data)
@@ -497,14 +500,17 @@ export function fontFaceRules(font: Font, urlFor: (file: FontFile) => string): s
     .join('\n')
 }
 
+/** Throws FontImportError when the browser cannot use a file, given with its bytes. */
+type Validate = (file: Blob, bytes: Uint8Array<ArrayBuffer>) => Promise<void>
+
 export interface AddFontOptions {
-  /** Throws FontImportError when the browser cannot use a file. Defaults to loading it. */
-  validate?: (file: Blob) => Promise<void>
+  /** Defaults to loading the file. */
+  validate?: Validate
 }
 
 /** Loads the file as the browser would for a book, which finds damage the metadata cannot. */
-async function loadsInBrowser(file: Blob): Promise<void> {
-  const face = new FontFace('carrel-probe', await file.arrayBuffer())
+async function loadsInBrowser(file: Blob, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
+  const face = new FontFace('carrel-probe', bytes)
   try {
     await face.load()
   } catch (error) {
@@ -590,11 +596,24 @@ async function addFiles(
   const [first] = files
   if (!first) throw new FontImportError('No font files were chosen.')
   for (const file of files) if (file.size > fontFileLimit) throw tooLarge(file.name)
+  // Each file is read once, for its metadata and to load it, and let go before the next.
   const read: { file: File; metadata: FontMetadata }[] = []
-  for (const file of files) read.push({ file, metadata: await readFontMetadata(file) })
-  const name = read[0]?.metadata.family || familyFromFileName(first.name)
-  await assertFamilyFree(name)
-  for (const file of files) await validate(file)
+  const name = await (async () => {
+    const bytes = new Uint8Array(await first.arrayBuffer())
+    const metadata = await metadataOf(bytes, first)
+    const family = metadata.family || familyFromFileName(first.name)
+    // Before any file is loaded, the slowest step.
+    await assertFamilyFree(family)
+    await validate(first, bytes)
+    read.push({ file: first, metadata })
+    return family
+  })()
+  for (const file of files.slice(1)) {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const metadata = await metadataOf(bytes, file)
+    await validate(file, bytes)
+    read.push({ file, metadata })
+  }
   const font: Font = {
     id: newId(),
     family: name,
@@ -739,7 +758,7 @@ function fileNameOf(url: URL): string {
 async function downloadFontFiles(
   urls: readonly URL[],
   fetchFont: typeof fetch,
-  validate: (file: Blob) => Promise<void>,
+  validate: Validate,
   onProgress?: (done: number, total: number) => void,
 ): Promise<Map<string, { data: File; format: FontFormat }>> {
   const files = new Map<string, { data: File; format: FontFormat }>()
@@ -758,7 +777,7 @@ async function downloadFontFiles(
         const format = detectFontFormat(body.bytes)
         if (format === 'collection') throw new FontImportError(collectionMessage)
         if (format === null) throw notAFont(data)
-        await validate(data)
+        await validate(data, body.bytes)
         files.set(url.href, { data, format })
       } catch (error) {
         failures.push(error)

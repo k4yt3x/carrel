@@ -93,8 +93,17 @@ function pwa() {
       ],
       launch_handler: { client_mode: 'focus-existing' },
     },
+    // The icons are among the files below already.
+    includeManifestIcons: false,
     workbox: {
       globPatterns: ['**/*.{html,js,mjs,css,svg,png,wasm,bcmap,pfb,ttf,woff2}'],
+      globIgnores: [
+        // PDF.js's decoders for a browser without WebAssembly. That is Lockdown Mode, which
+        // turns service workers off too, so it fetches them as it needs them.
+        '**/*_nowasm_fallback.js',
+        // foliate-js's read-aloud support, which Carrel doesn't use.
+        'assets/tts-*.js',
+      ],
       // pdf.worker.min.mjs is the largest file, about 1.3 MB. Workbox's default limit, 2 MiB,
       // leaves it little room to grow, and a file over the limit is left out of the precache
       // with no more than a warning in the build.
@@ -134,7 +143,13 @@ export default defineConfig({
           rename: { stripBase: true },
         },
         {
-          src: ['node_modules/pdfjs-dist/cmaps/*', 'node_modules/pdfjs-dist/standard_fonts/*'],
+          src: [
+            'node_modules/pdfjs-dist/cmaps/*',
+            // With the system's fonts in use, PDF.js loads Symbol and ZapfDingbats from here,
+            // and Liberation Sans where the device has no Helvetica or Arial; its other
+            // standard fonts are for XFA forms, which stay off.
+            'node_modules/pdfjs-dist/standard_fonts/{FoxitSymbol.pfb,FoxitDingbats.pfb,LiberationSans-*.ttf,LICENSE_*}',
+          ],
           dest: 'vendor/pdfjs',
           rename: { stripBase: 2 },
         },
@@ -165,6 +180,9 @@ export default defineConfig({
       // what the modern one takes for granted (Map.getOrInsertComputed, Math.sumPrecise and
       // others only in Safari 26.2 and Chrome 147), so PDFs open from Safari 18 on.
       '@pdfjs': resolve('./node_modules/pdfjs-dist/legacy/build'),
+      // foliate-js polyfills constructable stylesheets, which every browser Carrel supports
+      // has had since Safari 16.4.
+      'construct-style-sheets-polyfill': resolve('./src/empty.ts'),
     },
   },
   build: {

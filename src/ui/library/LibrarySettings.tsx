@@ -66,7 +66,7 @@ export function LibrarySettings({ open, restore = false, onClose }: LibrarySetti
         title="Backup"
         info="Your books are kept only in this browser, which may clear them to free space. A backup keeps them, your place in each and your settings in one file."
       >
-        <BackupSection />
+        <BackupSection open={open} />
       </Section>
       <Section title="Storage">
         <StorageSection open={open} />

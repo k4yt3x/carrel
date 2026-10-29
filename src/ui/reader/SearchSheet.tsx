@@ -12,7 +12,7 @@
 
 import type { SearchEvent, SearchMatch } from 'foliate-js/view.js'
 import { Search } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Sheet } from '@/ui/Sheet'
 
 interface SearchSheetProps {
@@ -42,13 +42,53 @@ const searchable = (query: string) =>
   query.length >= 2 ||
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(query)
 
+/**
+ * One chapter's matches. A group never changes once found, so the list stays as drawn while
+ * the reader turns pages behind it, however many matches a common word has.
+ */
+const MatchGroup = memo(function MatchGroup({
+  group,
+  onSelect,
+}: {
+  group: Group
+  onSelect(cfi: string): void
+}) {
+  return (
+    <section className="pb-4">
+      {group.label && (
+        <h3 className="truncate px-6 py-2 text-xs font-semibold text-fg-muted">
+          {group.label.trim()}
+        </h3>
+      )}
+      <ul>
+        {group.matches.map((match) => (
+          <li key={match.cfi}>
+            <button
+              type="button"
+              className="block w-full px-6 py-2 text-start text-sm leading-normal text-fg-secondary hover:bg-surface-hover focus-visible:-outline-offset-2"
+              onClick={() => onSelect(match.cfi)}
+            >
+              {match.excerpt.pre}
+              <mark className="rounded-sm bg-action-subtle font-semibold text-fg">
+                {match.excerpt.match}
+              </mark>
+              {match.excerpt.post}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+})
+
 export function SearchSheet({ open, onClose, search, clear, onSelect }: SearchSheetProps) {
   const [query, setQuery] = useState('')
   const [groups, setGroups] = useState<Group[]>([])
   const [status, setStatus] = useState<Status>({ name: 'idle' })
   const input = useRef<HTMLInputElement>(null)
-  const latest = useRef({ search, clear })
-  latest.current = { search, clear }
+  const latest = useRef({ search, clear, onSelect })
+  latest.current = { search, clear, onSelect }
+  const select = useCallback((cfi: string) => latest.current.onSelect(cfi), [])
   // The search running now, abandoned or not. An abandoned one stops at its next result, and
   // may outline that result in the book first, so the next search waits for it to stop.
   const running = useRef(Promise.resolve())
@@ -135,30 +175,7 @@ export function SearchSheet({ open, onClose, search, clear, onSelect }: SearchSh
       <div className="mt-4">
         {groups.map((group, groupIndex) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: groups only ever append
-          <section key={groupIndex} className="pb-4">
-            {group.label && (
-              <h3 className="truncate px-6 py-2 text-xs font-semibold text-fg-muted">
-                {group.label.trim()}
-              </h3>
-            )}
-            <ul>
-              {group.matches.map((match) => (
-                <li key={match.cfi}>
-                  <button
-                    type="button"
-                    className="block w-full px-6 py-2 text-start text-sm leading-normal text-fg-secondary hover:bg-surface-hover focus-visible:-outline-offset-2"
-                    onClick={() => onSelect(match.cfi)}
-                  >
-                    {match.excerpt.pre}
-                    <mark className="rounded-sm bg-action-subtle font-semibold text-fg">
-                      {match.excerpt.match}
-                    </mark>
-                    {match.excerpt.post}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <MatchGroup key={groupIndex} group={group} onSelect={select} />
         ))}
       </div>
     </Sheet>

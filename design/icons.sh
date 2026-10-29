@@ -7,11 +7,17 @@ cd "$(dirname "$0")/.."
 # Trims the artwork to its edges, centres it on a square SIDE across (an fx expression of the
 # trimmed width w and height h) and scales that to SIZE. The alpha is cleaned first: the
 # artwork's solid shapes are 254/255 opaque, and stray pixels of 1/255 lie around them.
+# An icon on a background is opaque, so it is stored with a palette of 256 colours, which
+# loses nothing that shows and makes the file about a quarter of the size; on a transparent
+# icon, the palette leaves jagged edges.
 render() {
+  if [ -n "${4:-}" ]; then palette='-dither None -colors 256' out="PNG8:public/icons/$3"
+  else palette='' out="public/icons/$3"; fi
+  # shellcheck disable=SC2086 # $palette is two options or none
   magick design/icon.webp \
     -channel A -level 0.5%,99.6% +channel -background none -alpha background -trim +repage \
     -set option:side "%[fx:ceil($1)]" -gravity center -extent '%[side]x%[side]' \
-    -resize "$2x$2" -background "${4:-none}" -flatten -strip -quality 95 "public/icons/$3"
+    -resize "$2x$2" -background "${4:-none}" -flatten $palette -strip -quality 95 "$out"
 }
 
 # The favicon fills its square, to read at 16 px; the app's icons keep a margin, like the

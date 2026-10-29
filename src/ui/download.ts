@@ -1,10 +1,12 @@
 import { isHomeScreenApp } from '@/ui/platform'
 
 /**
- * What became of a file handed over to be saved: 'retry' when the share sheet would not open
- * because the tap that asked for it was too long ago, and the reader has to tap again.
+ * What became of a file handed over to be saved: 'shared' once the share sheet is done with
+ * it; 'downloading' when a download has started, which may go on reading the file; 'retry'
+ * when the share sheet would not open because the tap that asked for it was too long ago, and
+ * the reader has to tap again.
  */
-export type SaveResult = 'saved' | 'cancelled' | 'retry'
+export type SaveResult = 'shared' | 'downloading' | 'cancelled' | 'retry'
 
 /**
  * Hands a file to the reader to keep. In a browser that is a download. In an app opened from
@@ -17,7 +19,7 @@ export async function saveFile(file: Blob, name: string): Promise<SaveResult> {
   if (isHomeScreenApp() && navigator.canShare?.({ files: [shared] })) {
     try {
       await navigator.share({ files: [shared] })
-      return 'saved'
+      return 'shared'
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled'
       if (error instanceof DOMException && error.name === 'NotAllowedError') return 'retry'
@@ -32,7 +34,7 @@ export async function saveFile(file: Blob, name: string): Promise<SaveResult> {
   // The download has taken its own reference by the time the click returns in every current
   // browser; the delay covers ones that start it a moment later.
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
-  return 'saved'
+  return 'downloading'
 }
 
 interface SaveFilePickerOptions {

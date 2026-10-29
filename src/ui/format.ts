@@ -35,6 +35,20 @@ export function formatLanguage(tag: string, locale?: string): string | null {
 
 const dayMs = 24 * 60 * 60 * 1000
 
+// Making a formatter costs far more than using one, and a list of books shows two days a book.
+const formatters = new Map<string, Intl.RelativeTimeFormat | Intl.DateTimeFormat>()
+function formatter<T extends Intl.RelativeTimeFormat | Intl.DateTimeFormat>(
+  key: string,
+  make: () => T,
+): T {
+  let made = formatters.get(key)
+  if (!made) {
+    made = make()
+    formatters.set(key, made)
+  }
+  return made as T
+}
+
 /**
  * A day as people say it: "Today", "Yesterday", "3 days ago" within the week, then the date,
  * with the year only when it isn't this one. Days are counted by the calendar, not by 24-hour
@@ -47,13 +61,20 @@ export function formatDay(time: number, now = Date.now(), locale?: string): stri
   }
   const days = Math.round((midnight(now) - midnight(time)) / dayMs)
   if (days >= 0 && days < 7) {
-    const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(-days, 'day')
+    const relative = formatter(
+      `relative ${locale}`,
+      () => new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }),
+    ).format(-days, 'day')
     return relative.charAt(0).toLocaleUpperCase(locale) + relative.slice(1)
   }
   const sameYear = new Date(time).getFullYear() === new Date(now).getFullYear()
-  return new Intl.DateTimeFormat(locale, {
-    day: 'numeric',
-    month: 'short',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(time)
+  return formatter(
+    `date ${locale} ${sameYear}`,
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        day: 'numeric',
+        month: 'short',
+        ...(sameYear ? {} : { year: 'numeric' }),
+      }),
+  ).format(time)
 }

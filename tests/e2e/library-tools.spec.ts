@@ -7,6 +7,19 @@ const addBooks = async (page: Page, ...files: FixtureFile[]) => {
   await expect(page.getByRole('status')).toContainText('Added')
 }
 
+/** The files a backup was written to in the app's private file system, where it has any. */
+const backupFiles = (page: Page) =>
+  page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory()
+    const names: string[] = []
+    try {
+      for await (const name of (await root.getDirectoryHandle('backups')).keys()) names.push(name)
+    } catch {
+      // No backup has made the folder.
+    }
+    return names
+  })
+
 const openSettings = async (page: Page) => {
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   return page.getByRole('dialog', { name: 'Settings' })
@@ -115,6 +128,8 @@ test('backs up the library and restores it after the book is removed', async ({ 
   await addBooks(page, fixtures.epub())
   // A place in the book, to see it come back.
   await page.getByRole('link', { name: 'The Test Book' }).first().click()
+  // The bars come with the book once it has opened, as the reader loads.
+  await expect(page.getByRole('button', { name: 'Reading settings' })).toBeAttached()
   await expect(page.getByRole('status')).toHaveCount(0)
   await page.keyboard.press('ArrowRight')
   await page.keyboard.press('ArrowRight')
@@ -129,6 +144,8 @@ test('backs up the library and restores it after the book is removed', async ({ 
   const backup = await download
   expect(backup.suggestedFilename()).toMatch(/^carrel-backup-\d{4}-\d{2}-\d{2}\.zip$/)
   await expect(settings.getByRole('status')).toHaveText('Backup saved.')
+  // Written to a file on disk rather than built in memory, and kept for the download.
+  expect(await backupFiles(page)).toEqual([expect.stringMatching(/^\d+-carrel-backup-/)])
   await settings.getByRole('button', { name: 'Close settings' }).click()
 
   await page.getByRole('button', { name: 'More actions for The Test Book' }).click()
@@ -146,6 +163,21 @@ test('backs up the library and restores it after the book is removed', async ({ 
   await expect(settings.getByRole('status')).toContainText('Added 1 book.')
   await settings.getByRole('button', { name: 'Close settings' }).click()
   await expect(card).toContainText(place)
+})
+
+test('clears backup files once their downloads have had time to finish', async ({ page }) => {
+  await page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory()
+    const backups = await root.getDirectoryHandle('backups', { create: true })
+    const hour = 60 * 60 * 1000
+    for (const made of [Date.now() - 2 * hour, Date.now() - hour / 2]) {
+      await backups.getFileHandle(`${made}-carrel-backup.zip`, { create: true })
+    }
+  })
+  await page.reload()
+  await expect.poll(() => backupFiles(page)).toHaveLength(1)
+  const [kept] = await backupFiles(page)
+  expect(Date.now() - Number.parseInt(kept ?? '', 10)).toBeLessThan(60 * 60 * 1000)
 })
 
 test('refuses a file that isn’t a backup', async ({ page }) => {
@@ -208,6 +240,7 @@ test('makes a theme of its own colours, and keeps it', async ({ page }) => {
   await page.reload()
   await expect(html).toHaveAttribute('data-theme', 'custom')
   await page.getByRole('link', { name: 'The Test Book' }).first().click()
+  await expect(page.getByRole('button', { name: 'Reading settings' })).toBeAttached()
   await expect(page.getByRole('status')).toHaveCount(0)
   await expect
     .poll(() =>
